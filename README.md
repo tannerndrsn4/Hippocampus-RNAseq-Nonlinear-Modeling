@@ -11,10 +11,10 @@ Steps 1-5 were completed using shell scripts.
 
 Steps 6-10 were completed using RStudio.
 
-6. Read count normalization w/ edgeR & limma 
-7. PCA analysis & Sample information figure generation 
-8. Nonlinear modeling differential expression analyses using ARIMA approach
-9. Gene dysregulation analysis
-10. Gene ontology enrichment analysis w/ enrichR
+6. **Read count normalization** w/ edgeR & limma 
+7. **PCA analysis & Sample information** figure generation 
+8. **Nonlinear modeling** differential expression analyses using ARIMA approach
+9. **Gene dysregulation analysis**
+10. **Gene ontology enrichment analysis** w/ enrichR
 
 All analyses were completed on UO's computer cluster Talapas.
