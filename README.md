@@ -15,6 +15,6 @@ Steps **6-10** were completed using RStudio.
 7. **PCA analysis & Sample information** figure generation -- [PCA_sampleinfo](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/PCA_sampleinfo)
 8. **Nonlinear modeling** differential expression analyses using ARIMA approach -- [nonlinear_modeling](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/nonlinear_modeling)
 9. **Gene dysregulation analysis** -- [dysregulation](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/dysregulation)
-10. **Gene ontology enrichment analysis** w/ enrichR
+10. **Gene ontology enrichment analysis** w/ enrichR -- [gene_ontology](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/gene_ontology)
 
 All analyses were completed on UO's computer cluster Talapas.
