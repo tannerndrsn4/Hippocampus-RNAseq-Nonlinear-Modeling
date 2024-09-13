@@ -1,4 +1,4 @@
-#histogram summarizing sample info
+###histogram summarizing sample info
 # Create the histogram
 samp <- ggplot(covariates, aes(x = age, fill = sex)) +
   geom_histogram(binwidth = 5, position = "stack") +
@@ -10,9 +10,7 @@ samp
 
 ggsave(filename = "Sampleinfo_histogram_88.pdf", samp)
 
-
-
-#PCA analysis
+###PCA analysis
 design <- model.matrix(~covariates$chip + covariates$lane)
 fit <-lmFit(v,design)
 fit <- eBayes(fit)
