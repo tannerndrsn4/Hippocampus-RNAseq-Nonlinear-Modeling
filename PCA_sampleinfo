@@ -1,0 +1,109 @@
+#histogram summarizing sample info
+# Create the histogram
+samp <- ggplot(covariates, aes(x = age, fill = sex)) +
+  geom_histogram(binwidth = 5, position = "stack") +
+  labs(x = "Age", y = "Frequency") +
+  scale_fill_manual(values = c("M" = "#98823c", "F" = "#9a5ea1")) +
+  theme_minimal()
+
+samp
+
+ggsave(filename = "Sampleinfo_histogram_88.pdf", samp)
+
+
+
+#PCA analysis
+design <- model.matrix(~covariates$chip + covariates$lane)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+
+#counts_pca = prcomp(cor(resid_counts), center = T, scale = T)
+counts_pca = prcomp(t(resid_counts))
+summary(counts_pca)[["importance"]] %>%
+  as.data.frame() %>%
+  dplyr::select(c(PC1, PC2, PC3))
+counts_pc <- as.data.frame(counts_pca$x) %>%
+  rownames_to_column(var = "sampid")
+counts_pc_meta <- left_join(counts_pc, covariates, by = "sampid")
+summary(lm(PC1 ~ sex + age_scaled, counts_pc_meta))
+
+counts_pca = prcomp(t(v))
+summary(counts_pca)[["importance"]] %>%
+  as.data.frame() %>%
+  dplyr::select(c(PC1, PC2, PC3))
+counts_pc <- as.data.frame(counts_pca$x) %>%
+  rownames_to_column(var = "sampid")
+counts_pc_meta <- left_join(counts_pc, covariates, by = "sampid")
+summary(lm(PC1 ~ sex + age_scaled, counts_pc_meta))
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=sex)) +
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 1 (23.14%)') + ylab('PC 2 (14.63%)') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18)) +
+  scale_color_manual(values = c("M" = "#98823c", "F" = "#9a5ea1"))
+plot(p)
+ggsave(filename = "PCA_Sex_96.pdf", p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=group)) +
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 1 (23.14%)') + ylab('PC 2 (14.63%)') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=age)) +
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 1 (23.14%)') + ylab('PC 2 (14.63%)') +
+  scale_color_distiller(palette='GnBu') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+ggsave(filename = "PCA_Age_96.pdf", p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=sex)) +
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=age)) +
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=group)) +
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=sex)) + 
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 1 (24.87%)') + ylab('PC 2 (9.81%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18)) +
+  scale_color_manual(values = c("M" = "#98823c", "F" = "#9a5ea1"))
+plot(p)
+ggsave(filename = "PCA_Sex.pdf", p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=group)) + 
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 1 (24.87%)') + ylab('PC 2 (9.81%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=age)) + 
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 1 (24.87%)') + ylab('PC 2 (9.81%)') +
+  scale_color_distiller(palette='GnBu') +
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+ggsave(filename = "PCA_Age.pdf", p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=sex)) + 
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=age)) + 
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=group)) + 
+  geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
