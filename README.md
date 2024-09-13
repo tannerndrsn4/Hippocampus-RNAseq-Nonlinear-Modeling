@@ -13,7 +13,7 @@ Steps **6-10** were completed using RStudio.
 
 6. **Read count normalization** w/ edgeR & limma -- [read_count_normalization](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/read_count_normalization) 
 7. **PCA analysis & Sample information** figure generation -- [PCA_sampleinfo](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/PCA_sampleinfo)
-8. **Nonlinear modeling** differential expression analyses using ARIMA approach
+8. **Nonlinear modeling** differential expression analyses using ARIMA approach -- [nonlinear_modeling](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/nonlinear_modeling)
 9. **Gene dysregulation analysis**
 10. **Gene ontology enrichment analysis** w/ enrichR
 
