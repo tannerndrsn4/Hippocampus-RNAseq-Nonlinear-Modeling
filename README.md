@@ -11,7 +11,7 @@ Steps **1-5** were completed using shell scripts.
 
 Steps **6-10** were completed using RStudio.
 
-6. **Read count normalization** w/ edgeR & limma 
+6. **Read count normalization** w/ edgeR & limma -- [read_count_normalization](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/read_count_normalization) 
 7. **PCA analysis & Sample information** figure generation 
 8. **Nonlinear modeling** differential expression analyses using ARIMA approach
 9. **Gene dysregulation analysis**
