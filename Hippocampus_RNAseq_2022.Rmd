@@ -1,0 +1,1036 @@
+---
+title: "Hippocampus_RNAseq_2022"
+output: html_document
+---
+### 1. Loading our respective packages and input data
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#loading the packages we will be using for this analysis
+library(edgeR)
+library(ggplot2)
+library(ggfortify)
+library(EMMREML)
+library(qvalue)
+library(cobs)
+library(DESeq2)
+library(pheatmap)
+library(tidyverse)
+library(dplyr)
+```
+
+Once the mapping of RNAseq data has been completed and a count matrix has been generated, we can finally begin the differential expression analysis.
+
+This first requires loading in relatedness matrix.
+
+```{r}
+# read/process relatedness matrix
+relatedness <- read.csv('relatedness_matrix.csv')
+rownames(relatedness) <- relatedness$X
+relatedness$X <- NULL
+colnames(relatedness) <- rownames(relatedness)
+```
+
+And the count matrix.
+
+```{r}
+#Load in count matrix 
+counts <- read.table('output.txt')
+rownames(counts) <- counts$V1
+counts$V1 <- NULL
+colnames(counts) <- colnames(relatedness)
+counts <- counts[2:34607,]
+genes <- rownames(counts)
+counts <- as.matrix(sapply(counts, as.numeric))
+rownames(counts) <- genes
+```
+
+We will also need to load in our metadata file.
+
+```{r}
+covariates <- read.csv('BrainSampleMetadata_RNASeq_22.csv')
+covariates$Age_scaled <- scale(as.numeric(covariates$Age,scale=F, center=T))
+covariates$SubjectID <- as.factor(covariates$SubjectID)
+covariates$Group <- as.factor(covariates$Group)
+head(covariates)
+```
+### 2. Filtering and data normalization
+
+Next, we need to filter out low count genes and normalize our read counts. 
+
+```{r}
+#filtering and normalization
+dge <- DGEList(counts = counts, group = covariates$Age_scaled)
+keep <- rowSums(cpm(counts, prior.count = 0.25, log = T) > 4) >= 15
+table(keep)
+dge <- dge[keep,,keep.lib.sizes=FALSE]
+dge_TMM <- calcNormFactors(dge)
+#v <- voom(dge_TMM)
+#v <- subset(v$E)
+#v <- na.omit(v)
+```
+
+### 3. Generating some PCAs
+
+```{r}
+design <- model.matrix(~covariates$Sex + covariates$Age_scaled)
+v <- voom(dge_TMM, design)
+v <- subset(v$E)
+v <- na.omit(v)
+
+counts_pca = prcomp(cor(v), center = T, scale = T)
+summary(counts_pca)[["importance"]] %>%
+  as.data.frame() %>%
+  dplyr::select(c(PC1, PC2, PC3))
+counts_pc <- as.data.frame(counts_pca$x) %>%
+  rownames_to_column(var = "SubjectID")
+counts_pc_meta <- left_join(counts_pc, covariates, by = "SubjectID")
+summary(lm(PC1 ~ Sex + Age_scaled, counts_pc_meta))
+```
+Generating some visuals from the prcomp function.
+```{r}
+autoplot(counts_pca, data = covariates, colour = 'Sex', label = TRUE)
+autoplot(counts_pca, data = covariates, colour = 'Age')
+autoplot(counts_pca, data = covariates, colour = 'Group')
+```
+```{r}
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=Sex)) + 
+  geom_point(size=2.5) + theme_classic() + xlab('PC 1 (57.72%)') + ylab('PC 2 (21.87%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=Age)) + 
+  geom_point(size=2.5) + theme_classic() + xlab('PC 1 (57.72%)') + ylab('PC 2 (21.87%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC1,y=PC2,color=Group)) + 
+  geom_point(size=2.5) + theme_classic() + xlab('PC 1 (57.72%)') + ylab('PC 2 (21.87%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=Sex)) + 
+  geom_point(size=2.5) + theme_classic() + xlab('PC 2 (21.87%)') + ylab('PC 3 (10.43%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=Age)) + 
+  geom_point(size=2.5) + theme_classic() + xlab('PC 2 (21.87%)') + ylab('PC 3 (10.43%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+
+p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=Group)) + 
+  geom_point(size=2.5) + theme_classic() + xlab('PC 2 (21.87%)') + ylab('PC 3 (10.43%)') + 
+  theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+plot(p)
+```
+
+```{r}
+# design <- model.matrix(~covariates$Sex + covariates$Age_scaled)
+# v <- voom(dge_TMM,design)
+# #v <- limma::removeBatchEffect(v$E)
+# 
+# # # Perform PCA and model 
+# # counts_pca = prcomp(cor(v$E), center = T, scale = T)
+# # summary(counts_pca)[["importance"]] %>% 
+# #   as.data.frame() %>% 
+# #   dplyr::select(c(PC1, PC2, PC3))  
+# # counts_pca <- as.data.frame(counts_pca$x) %>% 
+# #   rownames_to_column(var = "SubjectID")
+# # counts_pc_meta <- left_join(counts_pca, covariates, by = "SubjectID")
+# # summary(lm(PC1 ~ Sex + Age, counts_pc_meta))
+# 
+# 
+# pca = prcomp(cor(v$E), center = TRUE, scale = TRUE)
+# summary(pca)
+# plot.pca = as.data.frame(pca$x)
+# plot.pca$Sex = factor(covariates$Sex)
+# plot.pca$Age = covariates$Age
+# plot.pca$Group = factor(covariates$Group)
+# 
+# p = ggplot(plot.pca,aes(x=PC1,y=PC2,color=Age)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 1') + ylab('PC 2') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC1,y=PC2,color=Group)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 1') + ylab('PC 2') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC1,y=PC2,color=Sex)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 1') + ylab('PC 2') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# 
+# p = ggplot(plot.pca,aes(x=PC2,y=PC3,color=Age)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 2') + ylab('PC 3') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC2,y=PC3,color=Group)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 2') + ylab('PC 3') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC2,y=PC3,color=Sex)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 2') + ylab('PC 3') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC1,y=PC3,color=Age)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 1') + ylab('PC 3') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC1,y=PC3,color=Group)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 1') + ylab('PC 3') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# p = ggplot(plot.pca,aes(x=PC1,y=PC3,color=Sex)) + 
+#   geom_point(size=2.5) + theme_classic() + xlab('PC 1') + ylab('PC 3') + 
+#   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
+# plot(p)
+# 
+# # pc <- prcomp(v, center=TRUE)
+# # pc_eigenvalues <- pc$sdev^2
+# # # create a "tibble" manually with 
+# # # a variable indicating the PC number
+# # # and a variable with the variances
+# # pc_eigenvalues <- tibble(PC = factor(1:length(pc_eigenvalues)), 
+# #                          variance = pc_eigenvalues) %>% 
+# #   # add a new column with the percent variance
+# #   mutate(pct = variance/sum(variance)*100) %>% 
+# #   # add another column with the cumulative variance explained
+# #   mutate(pct_cum = cumsum(pct))
+# # 
+# # # print the result
+# # pc_eigenvalues
+# # 
+# # pc_eigenvalues %>% 
+# #   ggplot(aes(x = PC)) +
+# #   geom_col(aes(y = pct)) +
+# #   geom_line(aes(y = pct_cum, group = 1)) + 
+# #   geom_point(aes(y = pct_cum)) +
+# #   labs(x = "Principal component", y = "Fraction variance explained")
+
+```
+
+
+```{r}
+# # The PC scores are stored in the "x" value of the prcomp object
+# pc_scores <- pc$x
+# pc_scores <- pc_scores %>% 
+#   # convert to a tibble retaining the sample names as a new column
+#   as_tibble(rownames = "sample")
+# 
+# # print the result
+# pc_scores
+# 
+# pc_scores %>% 
+#   # create the plot
+#   ggplot(aes(x = PC1, y = PC2)) +
+#   geom_point()
+
+```
+
+Now, we can begin some preliminary analyses. Let's begin with some PCAs. 
+
+```{r}
+# #generating PCAs for normalized read counts
+# PCA_list <- as.data.frame(v)
+# pca <- prcomp(t(PCA_list), center = TRUE, scale. = TRUE)
+# pca.var <- pca$sdev^2
+# pca.eig <- as.data.frame(pca.var)
+# pca.eig
+# pca.var.per <- round(pca.var/sum(pca.var)*100, 1)
+# pca.data <- data.frame(Sample=rownames(pca$x),
+#   X=pca$x[,1],
+#   Y=pca$x[,2])
+# 
+# pca.data$Age <- covariates$Age_scaled
+# pca.data$Sex <- covariates$Sex
+# pca.data$Group <- covariates$Group
+# 
+# loading_scores <- pca$rotation[,1]
+# gene_scores <- abs(loading_scores) ## get the magnitudes
+# gene_score_ranked <- sort(gene_scores, decreasing=TRUE)
+# top_10_genes <- names(gene_score_ranked[1:10])
+# 
+# pca.data$Age
+# pca.data$Sex
+# pca.data$Group
+```
+
+Now we will use this space to make our different PCAs
+```{r}
+# ggplot(pca.data, aes(x=X, y=Y, col = Age)) +
+#   geom_point(size =3) +
+#   xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
+#   ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
+#   theme_minimal() +
+#   ggtitle("Gene expression clusters with age")
+# ggsave("Age_continuous_pca.pdf")
+# 
+# ggplot(pca.data, aes(x=X, y=Y, col = Sex)) +
+#   geom_point(size = 3) +
+#   xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
+#   ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
+#   theme_minimal() +
+#   ggtitle("Gene expression clusters with sex")
+# ggsave("Sex_pca.pdf")
+# 
+# ggplot(pca.data, aes(x=X, y=Y, col = Group)) +
+#   geom_point(size =3) +
+#   scale_colour_manual(name = "Age Group", labels = c("Juvenile", "Young adult", "Adult", "Old"), values=c("orange", "red", "green", "blue")) +
+#   xlab(paste("PC1 - ", pca.var.per[1], "%", sep="")) +
+#   ylab(paste("PC2 - ", pca.var.per[2], "%", sep="")) +
+#   theme_minimal() +
+#   theme(legend.position = "right") +
+#   ggtitle("Gene expression clusters with age groups")
+# ggsave("Age_binned_pca.pdf")
+```
+### 4. Making a Z matrix to run EMMREML
+
+Next, we will need to begin running our models and getting some preliminary results.
+
+We can begin by generating a Z matrix for our samples
+```{r}
+# generate Z matrix
+Z_mat <- matrix(nrow = 96, ncol=96);
+for(i in 1:96){
+  for(j in 1:96){
+    if(i==j){Z_mat[i,j] <- 1}
+    if(!(i==j)){Z_mat[i,j] <- 0}
+  }
+}
+```
+
+### 5. EMMREML: Gene expression ~ age [as a continuous variable]
+
+Now, we can construct our models. We have three models which we wish to test for our existing data. The first aims to model the effects of age on gene expression with age as a continuous variable. 
+
+```{r}
+# #### gene expression ~ age [as a continuous variable]
+# design <- model.matrix(~ covariates$Age_scaled)
+# v <- voom(dge_TMM,design)
+# v <- subset(v$E)
+# v <- na.omit(v)
+# age_effects <- as.data.frame(v[,1:(3*ncol(design))])
+# colnames(age_effects) <- c('beta.intercept','beta.age','varbeta.intercept','varbeta.age','pval.intercept','pval.age')
+# 
+# for(i in 1:nrow(v)){
+#   emma=emmreml(y=v[i,],X=design,Z=as.matrix(Z_mat),K=as.matrix(relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#   age_effects[i,]=t(c(emma$betahat,emma$varbetahat,emma$pvalbeta[,"none"]))
+# }
+# 
+# hist(age_effects$pval.age,breaks=50)
+# summary(age_effects$pval.age < 0.05, na.rm = T)
+# age_effects$qval <- qvalue(age_effects$pval.age)$qvalues
+# summary(age_effects$qval < 0.2, na.rm = T)
+# summary(age_effects$qval < 0.05, na.rm = T)
+```
+
+Now let's explore these results a little more to see how many genes are up or downregulated
+```{r}
+# age_effects_genes <- subset(age_effects, age_effects$qval < 0.05)
+# summary(age_effects_genes$beta.age > 0)
+# summary(age_effects_genes$beta.age < 0)
+```
+
+In order to have more confidence in these results, we will need to run permutations of our dataset in order to infer a relative FDR. This will help us to eliminate false positives and give us more robust results overall. This first requires us to write the perm.fdr function 
+
+```{r}
+# Writing the perm.fdr function
+perm.fdr=function(input_df,perm_df,Pvals_col_name,name){
+  
+  pvals_index=which(colnames(input_df)==Pvals_col_name)
+  ro<-input_df[order(input_df[,pvals_index]),]
+  p_obs <- data.frame(pvalue=ro[,pvals_index])
+  p_vector<-matrix(as.matrix(perm_df),ncol=1)
+  p_vector=data.frame(p_vector[order(p_vector)])
+  
+  F<-p_obs[,1]
+  F_o<-p_obs[,1]
+  pi_hat<-p_obs[,1]
+  
+  j=1
+  observed<-length(p_obs[,1])
+  randoms<-length(p_vector[,1])
+  
+  for(i in 1:observed)
+  {
+    repeat
+    {
+      if((p_vector[j,1]<p_obs[i,1])&j<randoms){j<-j+1}else{break}
+    }
+    F[i]=i/observed
+    F_o[i]=(j-1)/randoms
+    if(F_o[i]<1){pi_hat[i]=(1-F[i])/(1-F_o[i])}else{pi_hat[i]=1}
+  }
+  tabla <-data.frame(pi_hat,pval=p_obs[,1])
+  
+  tabla[1,]=c(1,0)
+  last_percentile_average=mean(tabla$pi_hat[as.integer(min((length(tabla[,1])*0.99),(nrow(tabla)-1)):length(tabla[,1]))])
+  tabla[nrow(tabla),]=c(last_percentile_average,1)
+  constraint_matrix=as.matrix(data.frame(c(0,2),c(0,1),c(1,0)))
+  f_hat<-suppressWarnings(cobs(tabla$pval,tabla$pi_hat,constraint="convex",pointwise=constraint_matrix,maxiter=1000,print.warn=FALSE,print.mesg=FALSE))
+  
+  f_hat_serie=f_hat$fitted
+  pi_o=f_hat_serie[length(f_hat_serie)]
+  pi_o=min(pi_o,1)
+  pi_o=max(pi_o,0)
+  
+  Fdr_ST_perm=pi_o*F_o/F
+  
+  for(i in 1:length(p_obs[,1]))
+  {
+    Fdr_ST_perm[i]=pi_o*F_o[i]/F[i]
+    if(i>1)
+    {
+      for(j in 1:(i-1))
+      {
+        if(Fdr_ST_perm[i-j]>Fdr_ST_perm[i]){Fdr_ST_perm[i-j]=Fdr_ST_perm[i]}else{break}
+      }
+    }
+    if(Fdr_ST_perm[i]>1)  Fdr_ST_perm[i]=1
+  }
+  
+  fdrs_df <-data.frame(ro,q_ST_perm=Fdr_ST_perm)
+  rownames(fdrs_df)=rownames(ro)
+  colnames(fdrs_df)[ncol(fdrs_df)]=paste0("fdr_",name)
+  
+  return(fdrs_df)
+}
+```
+
+Then we can run permutations to generate an empirical distribution of pvalues. 
+
+```{r}
+# iters = 100
+# for(iter in 1:iters){
+#   print(iter)
+#   #Permute Age among the set of samples flagged as F (one sample per individual)
+#   age_random=sample(covariates$Age_scaled)
+#   design = model.matrix(~age_random)
+#   
+#   res_null=v[,1:(ncol(design))]
+#   colnames(res_null)[1:ncol(design)]=paste0("p_value_age")
+#   #Fit a model for each gene using emmreml
+#   for(i in 1:nrow(v))
+#   {
+#     emma=emmreml(y=v[i,],X=design,Z=as.matrix(Z_mat),K=as.matrix(relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#     res_null[i,]=t(c(emma$pvalbeta[,"none"]))
+#   }
+#   if(iter==1)
+#   {
+#     shuffled_age_pvals <-data.frame(x=res_null[,"p_value_age"])
+#     rownames(shuffled_age_pvals)=rownames(res_null)
+#   } else {
+#     shuffled_age_pvals <- cbind(shuffled_age_pvals,x=res_null[,"p_value_age"])
+#   }
+# }
+```
+
+Finally, we can use the perm.fdr function to generate FDRs based off of the results from our model. 
+
+```{r}
+# AgeEffects_FDR <- perm.fdr(data.frame(age_effects),shuffled_age_pvals,"pval.age","AgeFDR")
+# AgeEffects_FDR
+# summary(AgeEffects_FDR$fdr_AgeFDR < 0.2)
+# AgeEffects_FDR[AgeEffects_FDR$fdr_AgeFDR < 0.2, c('fdr_AgeFDR')]
+# summary(AgeEffects_FDR$fdr_AgeFDR < 0.5)
+# AgeEffects_FDR[AgeEffects_FDR$fdr_AgeFDR < 0.5, c('fdr_AgeFDR')]
+# summary(AgeEffects_FDR$p_value_age < 0.05)
+# summary(AgeEffects_FDR$qval < 0.2)
+# 
+# colnames(shuffled_age_pvals) <- 1:100
+# tmp1 <- reshape2::melt(shuffled_age_pvals)
+# ggplot() + geom_density(aes(x=tmp1$value)) + theme(legend.position = "none")
+```
+
+
+### 6. EMMREML: Gene expression ~ sex + age
+
+The second model aims to model the effects of age on gene expression while including sex as a covariate. 
+
+```{r}
+# #### gene expression ~ sex + age [as a continuous variable]
+# design <- model.matrix(~ covariates$Sex + covariates$Age_scaled)
+# colnames(design) <- c('intercept','Sex','Age')
+# v <- voom(dge_TMM,design, plot = TRUE)
+# v <- subset(v$E)
+# v <- na.omit(v)
+# age_effects <- as.data.frame(v[,1:(3*ncol(design))])
+# colnames(age_effects)[1:ncol(design)]=paste0("beta_",colnames(design))
+# colnames(age_effects)[(ncol(design)+1):(2*ncol(design))]=paste0("var_",colnames(design))
+# colnames(age_effects)[((2*ncol(design))+1):(3*ncol(design))]=paste0("p_val_",colnames(design))
+# 
+# for(i in 1:nrow(v)){
+#   emma=emmreml(y=v[i,],X=design,Z=as.matrix(Z_mat),K=as.matrix(relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#   age_effects[i,]=t(c(emma$betahat,emma$varbetahat,emma$pvalbeta[,"none"]))
+# }
+# 
+# hist(age_effects$p_val_Age,breaks=50)
+# summary(age_effects$p_val_Age < 0.05, na.rm = T)
+# age_effects$qval <- qvalue(age_effects$p_val_Age)$qvalues
+# summary(age_effects$qval < 0.2, na.rm = T)
+# summary(age_effects$qval < 0.05, na.rm = T)
+# h <- hist(age_effects$p_val_Age,breaks=50)
+# ```
+# ```{r}
+# iters = 100
+# for(iter in 1:iters){
+#   print(iter)
+#   #Permute Age among the set of samples flagged as F (one sample per individual)
+#   sex_random=sample(covariates$Sex)
+#   age_random=sample(covariates$Age_scaled)
+#   design = model.matrix(~sex_random + age_random)
+#   colnames(design) <- c('intercept','Sex','Age')
+#   
+#   res_null=v[,1:(ncol(design))]
+#   colnames(res_null)[1:ncol(design)]=paste0("p_val_",colnames(design))
+#   #Fit a model for each gene using emmreml
+#   for(i in 1:nrow(v))
+#   {
+#     emma=emmreml(y=v[i,],X=design,Z=as.matrix(Z_mat),K=as.matrix(relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#     res_null[i,]=t(c(emma$pvalbeta[,"none"]))
+#   }
+#   if(iter==1)
+#   {
+#     shuffled_age_pvals <-data.frame(x=res_null[,"p_val_Age"])
+#     rownames(shuffled_age_pvals)=rownames(res_null)
+#   } else {
+#     shuffled_age_pvals <- cbind(shuffled_age_pvals,x=res_null[,"p_val_Age"])
+#   }
+# }
+```
+
+```{r}
+# AgeCovEffects_FDR <- perm.fdr(data.frame(age_effects),shuffled_age_pvals,"p_val_Age","AgeFDR")
+# AgeCovEffects_FDR
+# summary(AgeCovEffects_FDR$fdr_AgeFDR < 0.2)
+# #AgeCovEffects_FDR[AgeCovEffects_FDR$fdr_AgeFDR < 0.2, c('fdr_AgeFDR')]
+# summary(AgeCovEffects_FDR$fdr_AgeFDR < 0.05)
+# #AgeCovEffects_FDR[AgeCovEffects_FDR$fdr_AgeFDR < 0.5, c('fdr_AgeFDR')]
+# summary(AgeCovEffects_FDR$p_val_Age < 0.05)
+# summary(AgeCovEffects_FDR$qval < 0.2)
+# 
+# colnames(shuffled_age_pvals) <- 1:100
+# tmp1 <- reshape2::melt(shuffled_age_pvals)
+# ggplot() + geom_density(aes(x=tmp1$value)) + theme(legend.position = "none")
+# ```
+# ```{r}
+# summary(AgeCovEffects_FDR$fdr_AgeFDR < 0.2)
+# summary(AgeCovEffects_FDR$p_val_Age < 0.05)
+# 
+# AgeCovEffects_Genes <- subset(AgeCovEffects_FDR, AgeCovEffects_FDR$fdr_AgeFDR < 0.2)
+# AgeCovEffects_Genes <- subset(AgeCovEffects_Genes, AgeCovEffects_Genes$p_val_Age < 0.05)
+# 
+# summary(AgeCovEffects_Genes$beta_Age > 0)
+# summary(AgeCovEffects_Genes$beta_Age < 0)
+# 
+# AgeCov_Upregulated <- subset(AgeCovEffects_Genes, AgeCovEffects_Genes$beta_Age > 0)
+# AgeCov_Upregulated <- AgeCov_Upregulated[order(AgeCov_Upregulated$beta_Age), ]
+# AgeCov_Downregulated <- subset(AgeCovEffects_Genes, AgeCovEffects_Genes$beta_Age < 0)
+# AgeCov_Downregulated <- AgeCov_Downregulated[order(AgeCov_Downregulated$beta_Age), ]
+# 
+# head(AgeCov_Upregulated)
+# head(AgeCov_Downregulated)
+# 
+# library(data.table)
+# setDT(AgeCov_Upregulated, keep.rownames = TRUE)[]
+# names(AgeCov_Upregulated)[1] <- 'Gene'
+# AgeCov_Upregulated <- as.data.frame(AgeCov_Upregulated)
+# write_csv(AgeCov_Upregulated, "AgeCov_Upregulated.csv")
+# 
+# setDT(AgeCov_Downregulated, keep.rownames = TRUE)[]
+# names(AgeCov_Downregulated)[1] <- 'Gene'
+# AgeCov_Downregulated <- as.data.frame(AgeCov_Downregulated)
+# write_csv(AgeCov_Downregulated, "AgeCov_Downregulated.csv")
+# 
+# save(AgeCov_Upregulated, AgeCov_Downregulated, covariates, file = "AgeEMMREML.RData")
+```
+
+```{r}
+# library(data.table)
+# setDT(age_effects, keep.rownames = TRUE)[]
+# names(age_effects)[1] <- 'Gene'
+# age_effects <- as.data.frame(age_effects)
+# write_csv(age_effects, "age_effects.csv")
+```
+
+Now we can make some figures of some genes of particular interest. 
+```{r}
+library(grid)
+library(reshape2)
+# genes_up_fig <- as.data.frame(v['SERPINA3',])
+# PAEP <- as.data.frame(v['PAEP',])
+# HHATL <- as.data.frame(v['HHATL',])
+# MAMUDRA <- as.data.frame(v['MAMU-DRA',])
+# CNDP1 <- as.data.frame(v['CNDP1',])
+# CHI3L1 <- as.data.frame(v['CHI3L1',])
+# APLNR <- as.data.frame(v['APLNR',])
+# SERPINA1 <- as.data.frame(v['SERPINA1',])
+# MAMUDRB1 <- as.data.frame(v['MAMU-DRB1',])
+# CD74 <- as.data.frame(v['CD74',])
+# 
+# genes_up_fig$PAEP <- PAEP$`v["PAEP", ]`
+# genes_up_fig$HHATL <- HHATL$`v["HHATL", ]`
+# genes_up_fig$MAMUDRA <- MAMUDRA$`v["MAMU-DRA", ]`
+# genes_up_fig$CNDP1 <- CNDP1$`v["CNDP1", ]`
+# #genes_up_fig$CHI3L1 <- CHI3L1$`v["CHI3L1", ]`
+# #genes_up_fig$APLNR <- APLNR$`v["APLNR", ]`
+# #genes_up_fig$SERPINA1 <- SERPINA1$`v["SERPINA1", ]`
+# #genes_up_fig$MAMUDRB1 <- MAMUDRB1$`v["MAMU-DRB1", ]`
+# #genes_up_fig$CD74 <- CD74$`v["CD74", ]`
+# 
+# genes_up_fig$Age <- covariates$Age
+# genes_up_fig$Sex <- covariates$Sex
+# colnames(genes_up_fig)[1] <- c('SERPINA3')
+# 
+# genes_up_fig = melt(genes_up_fig, id=c("Age", "Sex"))
+# 
+# v1 <- ggplot(genes_up_fig, aes(x=Age, y=value, col=variable)) +
+#   geom_point() +
+#   geom_smooth(method='lm',aes(x=Age, y=value, col=variable), fullrange=T, se=F) +
+#   ylab('Normalized read counts') +
+#   scale_color_brewer(palette = 'Dark2', name='Gene') +
+#   theme_minimal()
+# 
+# #ggsave('top5upregulatedgenes', v1)
+# v1
+# 
+# five_up <- c('SERPINA3', 'PAEP', 'HHATL', 'MAMU-DRA', 'CNDP1')
+# five_up <- age_effects[rownames(age_effects) %in% five_up, ]
+# five_up <- t(five_up)
+# 
+# 
+# genes_down_fig <- as.data.frame(v['LOC704083',])
+# RPS4Y1 <- as.data.frame(v['RPS4Y1',])
+# LOC697476 <- as.data.frame(v['LOC697476',])
+# WIF1 <- as.data.frame(v['WIF1',])
+# NPPA <- as.data.frame(v['NPPA',])
+# 
+# genes_down_fig$RPS4Y1 <- RPS4Y1$`v["RPS4Y1", ]`
+# genes_down_fig$LOC697476 <- LOC697476$`v["LOC697476", ]`
+# genes_down_fig$WIF1 <- WIF1$`v["WIF1", ]`
+# genes_down_fig$NPPA <- NPPA$`v["NPPA", ]`
+# 
+# genes_down_fig$Age <- covariates$Age
+# genes_down_fig$Sex <- covariates$Sex
+# colnames(genes_down_fig)[1] <- c('LOC704083')
+# 
+# genes_down_fig = melt(genes_down_fig, id=c("Age", "Sex"))
+# 
+# v2 <- ggplot(genes_down_fig, aes(x=Age, y=value, col=variable)) +
+#   geom_point() +
+#   geom_smooth(method='lm',aes(x=Age, y=value, col=variable), fullrange=T, se=F) +
+#   ylab('Normalized read counts') +
+#   scale_color_brewer(palette = 'Dark2', name='Gene') +
+#   theme_minimal() 
+# 
+# #ggsave('top5downregulatedgenes', v1)
+# v2
+# ```
+# 
+# 
+ 
+```
+
+Now we can rerun this model while excluding 8 individuals. 8 beacuse of choroid plexus tissue contamination, and 2 because of their outlier status.
+
+```{r}
+# Making our input dataframes
+design <- model.matrix(~ covariates$Sex + covariates$Age_scaled)
+colnames(design) <- c('intercept','Sex','Age')
+v <- voom(dge_TMM,design)
+v <- subset(v$E)
+v <- na.omit(v)
+
+omit <- c("20267", "23298", "27796", "27381", "20616", "20698", "24699", "18621")
+new_metadata <- filter(covariates, !(SubjectID %in% omit))
+new_relatedness <- relatedness[c(new_metadata$SubjectID),c(new_metadata$SubjectID)]
+z_new <- Z_mat[1:88,1:88]
+dge_new <- subset(v, select = c(new_metadata$SubjectID))
+
+dim(new_metadata)
+dim(new_relatedness)
+dim(z_new)
+dim(dge_new)
+```
+
+```{r}
+#### gene expression ~ sex + age [as a continuous variable] for new 88 indviduals
+design <- model.matrix(~ new_metadata$Sex + new_metadata$Age_scaled)
+colnames(design) <- c('intercept','Sex','Age')
+
+newage_effects <- as.data.frame(v[,1:(3*ncol(design))])
+colnames(newage_effects)[1:ncol(design)]=paste0("beta_",colnames(design))
+colnames(newage_effects)[(ncol(design)+1):(2*ncol(design))]=paste0("var_",colnames(design))
+colnames(newage_effects)[((2*ncol(design))+1):(3*ncol(design))]=paste0("p_val_",colnames(design))
+
+for(i in 1:nrow(dge_new)){
+  emma=emmreml(y=dge_new[i,],X=design,Z=as.matrix(z_new),K=as.matrix(new_relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+  newage_effects[i,]=t(c(emma$betahat,emma$varbetahat,emma$pvalbeta[,"none"]))
+}
+
+hist(newage_effects$p_val_Age,breaks=50)
+summary(newage_effects$p_val_Age < 0.05, na.rm = T)
+newage_effects$qval <- qvalue(newage_effects$p_val_Age)$qvalues
+summary(newage_effects$qval < 0.2, na.rm = T)
+summary(newage_effects$qval < 0.05, na.rm = T)
+h <- hist(newage_effects$p_val_Age,breaks=50)
+
+save(newage_effects, new_metadata, file = "AgeCovEMMREML.RData")
+```
+```{r}
+iters = 100
+for(iter in 1:iters){
+  print(iter)
+  #Permute Age among the set of samples flagged as F (one sample per individual)
+  sex_random=sample(new_metadata$Sex)
+  age_random=sample(new_metadata$Age_scaled)
+  design = model.matrix(~sex_random + age_random)
+  colnames(design) <- c('intercept','Sex','Age')
+  
+  res_null=dge_new[,1:(ncol(design))]
+  colnames(res_null)[1:ncol(design)]=paste0("p_val_",colnames(design))
+  #Fit a model for each gene using emmreml
+  for(i in 1:nrow(dge_new))
+  {
+    emma=emmreml(y=dge_new[i,],X=design,Z=as.matrix(z_new),K=as.matrix(new_relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+    res_null[i,]=t(c(emma$pvalbeta[,"none"]))
+  }
+  if(iter==1)
+  {
+    shuffled_age_pvals <-data.frame(x=res_null[,"p_val_Age"])
+    rownames(shuffled_age_pvals)=rownames(res_null)
+  } else {
+    shuffled_age_pvals <- cbind(shuffled_age_pvals,x=res_null[,"p_val_Age"])
+  }
+}
+```
+
+```{r}
+NewAgeCovEffects_FDR <- perm.fdr(data.frame(newage_effects),shuffled_age_pvals,"p_val_Age","AgeFDR")
+NewAgeCovEffects_FDR
+summary(NewAgeCovEffects_FDR$fdr_AgeFDR < 0.2)
+#AgeCovEffects_FDR[AgeCovEffects_FDR$fdr_AgeFDR < 0.2, c('fdr_AgeFDR')]
+summary(NewAgeCovEffects_FDR$fdr_AgeFDR < 0.05)
+#AgeCovEffects_FDR[AgeCovEffects_FDR$fdr_AgeFDR < 0.5, c('fdr_AgeFDR')]
+summary(NewAgeCovEffects_FDR$p_val_Age < 0.05)
+summary(NewAgeCovEffects_FDR$qval < 0.2)
+
+colnames(shuffled_age_pvals) <- 1:100
+tmp1 <- reshape2::melt(shuffled_age_pvals)
+ggplot() + geom_density(aes(x=tmp1$value)) + theme(legend.position = "none")
+```
+
+```{r}
+NewAgeCovEffects_Genes <- subset(NewAgeCovEffects_FDR, NewAgeCovEffects_FDR$fdr_AgeFDR < 0.05)
+NewAgeCovEffects_Genes <- subset(NewAgeCovEffects_Genes, NewAgeCovEffects_Genes$p_val_Age < 0.05)
+
+summary(NewAgeCovEffects_Genes$beta_Age > 0)
+summary(NewAgeCovEffects_Genes$beta_Age < 0)
+
+NewAgeCov_Upregulated <- subset(NewAgeCovEffects_Genes, NewAgeCovEffects_Genes$beta_Age > 0)
+NewAgeCov_Upregulated <- NewAgeCov_Upregulated[order(NewAgeCov_Upregulated$beta_Age), ]
+NewAgeCov_Downregulated <- subset(NewAgeCovEffects_Genes, NewAgeCovEffects_Genes$beta_Age < 0)
+NewAgeCov_Downregulated <- NewAgeCov_Downregulated[order(NewAgeCov_Downregulated$beta_Age), ]
+
+head(NewAgeCov_Upregulated)
+head(NewAgeCov_Downregulated)
+
+library(data.table)
+setDT(NewAgeCov_Upregulated, keep.rownames = TRUE)[]
+names(NewAgeCov_Upregulated)[1] <- 'Gene'
+NewAgeCov_Upregulated <- as.data.frame(NewAgeCov_Upregulated)
+write_csv(NewAgeCov_Upregulated, "NewAgeCov_Upregulated.csv")
+
+setDT(NewAgeCov_Downregulated, keep.rownames = TRUE)[]
+names(NewAgeCov_Downregulated)[1] <- 'Gene'
+NewAgeCov_Downregulated <- as.data.frame(NewAgeCov_Downregulated)
+write_csv(NewAgeCov_Downregulated, "NewAgeCov_Downregulated.csv")
+
+save(NewAgeCov_Upregulated, NewAgeCov_Downregulated, new_metadata, file = "NewAgeEMMREML.RData")
+```
+
+### 7. EMMREML: Gene expression ~ age [as a continuous variable] nested within sex
+
+The third will model the effects of age as a continuous variable on gene expression while being nested within sex.
+
+```{r}
+# #### gene expression ~sex + sex:age
+# design <- model.matrix(~covariates$Sex + covariates$Sex:covariates$Age_scaled)
+# colnames(design) <- c('intercept','Sex','Female.age','Male.age')
+# v <- voom(dge_TMM,design)
+# v <- subset(v$E)
+# v <- na.omit(v)
+# sexage_effects <- as.data.frame(v[,1:(3*ncol(design))])
+# colnames(sexage_effects)[1:ncol(design)]=paste0("beta_",colnames(design))
+# colnames(sexage_effects)[(ncol(design)+1):(2*ncol(design))]=paste0("var_",colnames(design))
+# colnames(sexage_effects)[((2*ncol(design))+1):(3*ncol(design))]=paste0("p_val_",colnames(design))
+# 
+# for(i in 1:nrow(v)){
+#   emma=emmreml(y=v[i,],X=design,Z=as.matrix(Z_mat),K=as.matrix(relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#   sexage_effects[i,]=t(c(emma$betahat,emma$varbetahat,emma$pvalbeta[,"none"]))
+# }
+# 
+# sexage_effects <- as.data.frame(sexage_effects)
+# hist(sexage_effects$p_val_Female.age,breaks=50)
+# hist(sexage_effects$p_val_Male.age,breaks=50)
+# hist(sexage_effects$p_val_Sex,breaks=50)
+# 
+# summary(sexage_effects$p_val_Female.age < 0.05, na.rm = T)
+# summary(sexage_effects$p_val_Male.age < 0.05, na.rm = T)
+# 
+# sexage_effects$qval.Female <- qvalue(sexage_effects$p_val_Female.age)$qvalues
+# sexage_effects$qval.Male <- qvalue(sexage_effects$p_val_Male.age)$qvalues
+# summary(sexage_effects$qval.Female < 0.2, na.rm = T)
+# summary(sexage_effects$qval.Male < 0.2, na.rm = T)
+# summary(sexage_effects$qval.Female < 0.05, na.rm = T)
+# summary(sexage_effects$qval.Male < 0.05, na.rm = T)
+```
+
+Now let's explore these results a little more to see how many genes are up or downregulated
+
+```{r}
+# sexage_effects_genes_F <- subset(sexage_effects, sexage_effects$qval.Female < 0.2)
+# sexage_effects_genes_M <- subset(sexage_effects, sexage_effects$qval.Male < 0.2)
+# 
+# summary(sexage_effects_genes_F$beta_Female.age > 0)
+# summary(sexage_effects_genes_F$beta_Female.age < 0)
+# summary(sexage_effects_genes_M$beta_Male.age > 0)
+# summary(sexage_effects_genes_M$beta_Male.age < 0)
+```
+
+Next, we can run our permutations on our respective datasets. First, let's prepare our covariates file.
+
+```{r}
+# covariates$Sex
+# covariates_2 <- covariates
+# covariates_2$Sex[covariates_2$Sex == "F"] <- 0
+# covariates_2$Sex[covariates_2$Sex == "M"] <- 1
+# covariates_2$Sex
+```
+
+Next, we can permute our ages among our sets of samples flagged either female or male
+
+```{r}
+# Permutations for model with age nested within sex
+# iters = 100
+# for(iter in 1:iters){
+#   print(iter)
+#   #Permute Age among the set of samples flagged as F (one sample per individual)
+#   covariates_2$Age[which(covariates$Sex==0)]=sample(covariates_2$Age_scaled[which(covariates$Sex==0)])
+#   covariates_2$Age[which(covariates$Sex==1)]=sample(covariates_2$Age_scaled[which(covariates$Sex==1)])
+#   
+#   design_2 <- model.matrix(~covariates_2$Sex + covariates_2$Sex:covariates_2$Age_scaled)
+#   colnames(design_2) <- c('intercept','Sex','Female.age','Male.age')
+#   
+#   res_null=v[,1:(ncol(design_2))]
+#   colnames(res_null)[1:ncol(design_2)]=paste0("p_val_",colnames(design_2))
+#   
+#   
+#   for(i in 1:nrow(v)){
+#     emma=emmreml(y=v[i,],X=design_2,Z=as.matrix(Z_mat),K=as.matrix(relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#     res_null[i,]=t(c(emma$pvalbeta[,"none"]))
+#   }
+#   
+#   #we register p-values of the associations to Age for females and males
+#   if(iter==1)
+#   {
+#     shuffled_age_pvals_female <-data.frame(x=res_null[,"p_val_Female.age"])
+#     shuffled_age_pvals_male <-data.frame(x=res_null[,"p_val_Male.age"])
+#     
+#     rownames(shuffled_age_pvals_female)=rownames(res_null)
+#     rownames(shuffled_age_pvals_male)=rownames(res_null)
+#   } else {
+#     shuffled_age_pvals_female <- cbind(shuffled_age_pvals_female,x=res_null[,"p_val_Female.age"])
+#     shuffled_age_pvals_male <- cbind(shuffled_age_pvals_male,x=res_null[,"p_val_Male.age"])
+#   }
+# }
+```
+
+Then, we can run our perm.fdr function to calculate respective FDRs for our data. 
+
+```{r}
+# AgeEffects_FDR <- perm.fdr(data.frame(sexage_effects),shuffled_age_pvals_female,"p_val_Female.age","AgeFemaleFDR")
+# AgeEffects_FDR <- perm.fdr(data.frame(AgeEffects_FDR),shuffled_age_pvals_male,"p_val_Male.age","AgeMaleFDR")
+# AgeEffects_FDR
+# summary(AgeEffects_FDR$fdr_AgeFemaleFDR < 0.2)
+# summary(AgeEffects_FDR$fdr_AgeMaleFDR < 0.2)
+# AgeEffects_FDR[AgeEffects_FDR$fdr_AgeFemaleFDR < 0.2, c('fdr_AgeFemaleFDR')]
+# AgeEffects_FDR[AgeEffects_FDR$fdr_AgeMaleFDR < 0.2, c('fdr_AgeMaleFDR')]
+# summary(AgeEffects_FDR$fdr_AgeFemaleFDR < 0.5)
+# summary(AgeEffects_FDR$fdr_AgeMaleFDR < 0.5)
+# AgeEffects_FDR[AgeEffects_FDR$fdr_AgeFemaleFDR < 0.5, c('fdr_AgeFemaleFDR')]
+# AgeEffects_FDR[AgeEffects_FDR$fdr_AgeMaleFDR < 0.5, c('fdr_AgeMaleFDR')]
+# summary(AgeEffects_FDR$p_val_Female.age < 0.05)
+# summary(AgeEffects_FDR$p_val_Male.age < 0.05)
+# summary(AgeEffects_FDR$qval.Female < 0.2)
+# summary(AgeEffects_FDR$qval.Male < 0.2)
+# 
+# colnames(shuffled_age_pvals_female) <- 1:100
+# tmp1 <- reshape2::melt(shuffled_age_pvals_female)
+# ggplot() + geom_density(aes(x=tmp1$value)) + theme(legend.position = "none")
+# 
+# colnames(shuffled_age_pvals_male) <- 1:100
+# tmp2 <- reshape2::melt(shuffled_age_pvals_male)
+# ggplot() + geom_density(aes(x=tmp2$value, color=tmp2$variable)) + theme(legend.position = "none")
+```
+
+### 8. EMMREML: Age as a continuous variable; splitting apart the male and female datasets
+
+We are also interested in looking at sex-specific patterns of gene expression (i.e., how does age affect gene expression within sex groups). To do this, we first want to split our dataset into two that contain information for just the females and just the males respectively. 
+
+```{r}
+# # Making our input dataframes
+# design <- model.matrix(~ covariates$Age_scaled)
+# v <- voom(dge_TMM,design)
+# v <- subset(v$E)
+# v <- na.omit(v)
+# 
+# female_metadata <- subset(covariates, covariates$Sex == "F")
+# female_relatedness <- relatedness[c(female_metadata$SubjectID),c(female_metadata$SubjectID)]
+# z_female <- Z_mat[1:60,1:60]
+# dge_female <- subset(v, select = c(female_metadata$SubjectID))
+# 
+# male_metadata <- subset(covariates, covariates$Sex == "M")
+# male_relatedness <- relatedness[c(male_metadata$SubjectID),c(male_metadata$SubjectID)]
+# z_male <- Z_mat[1:36,1:36]
+# dge_male <- subset(v, select = c(male_metadata$SubjectID))
+```
+
+Once we have our input dataframes, we can then build our models for males and females respectively. 
+
+```{r}
+# #### gene expression ~ age [as a continuous variable] for females
+# design <- model.matrix(~ female_metadata$Age_scaled)
+# female_effects <- as.data.frame(v[,1:(3*ncol(design))])
+# colnames(female_effects) <- c('beta.intercept','beta.age','varbeta.intercept','varbeta.age','pval.intercept','pval.age')
+# 
+# for(i in 1:nrow(dge_female)){
+#   emma=emmreml(y=dge_female[i,],X=design,Z=as.matrix(z_female),K=as.matrix(female_relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#   female_effects[i,]=t(c(emma$betahat,emma$varbetahat,emma$pvalbeta[,"none"]))
+# }
+# 
+# hist(female_effects$pval.age,breaks=50)
+# summary(female_effects$pval.age < 0.05, na.rm = T)
+# female_effects$qval <- qvalue(female_effects$pval.age)$qvalues
+# summary(female_effects$qval < 0.2, na.rm = T)
+# summary(female_effects$qval < 0.05, na.rm = T)
+```
+And our permuations
+
+```{r}
+# iters = 100
+# for(iter in 1:iters){
+#   print(iter)
+#   #Permute Age among the set of samples flagged as F (one sample per individual)
+#   female_random=sample(female_metadata$Age_scaled)
+#   design = model.matrix(~female_random)
+#   
+#   res_null=dge_female[,1:(ncol(design))]
+#   colnames(res_null)[1:ncol(design)]=paste0("p_value_age")
+#   #Fit a model for each gene using emmreml
+#   for(i in 1:nrow(dge_female))
+#   {
+#     emma=emmreml(y=dge_female[i,],X=design,Z=as.matrix(z_female),K=as.matrix(female_relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#     res_null[i,]=t(c(emma$pvalbeta[,"none"]))
+#   }
+#   if(iter==1)
+#   {
+#     shuffled_female_pvals <-data.frame(x=res_null[,"p_value_age"])
+#     rownames(shuffled_female_pvals)=rownames(res_null)
+#   } else {
+#     shuffled_female_pvals <- cbind(shuffled_female_pvals,x=res_null[,"p_value_age"])
+#   }
+# }
+```
+
+Finally, we can use the perm.fdr function to generate FDRs based off of the results from our model. 
+
+```{r}
+# FemaleEffects_FDR <- perm.fdr(data.frame(female_effects),shuffled_female_pvals,"pval.age","AgeFDR")
+# FemaleEffects_FDR
+# summary(FemaleEffects_FDR$fdr_AgeFDR < 0.2)
+# FemaleEffects_FDR[FemaleEffects_FDR$fdr_AgeFDR < 0.2, c('fdr_AgeFDR')]
+# summary(FemaleEffects_FDR$fdr_AgeFDR < 0.5)
+# FemaleEffects_FDR[FemaleEffects_FDR$fdr_AgeFDR < 0.5, c('fdr_AgeFDR')]
+# summary(FemaleEffects_FDR$p_value_age < 0.05)
+# summary(FemaleEffects_FDR$qval < 0.2)
+# 
+# colnames(shuffled_female_pvals) <- 1:100
+# tmp1 <- reshape2::melt(shuffled_female_pvals)
+# ggplot() + geom_density(aes(x=tmp1$value)) + theme(legend.position = "none")
+```
+
+We can then do the same for our males
+
+```{r}
+# #### gene expression ~ age [as a continuous variable] for males
+# design <- model.matrix(~ male_metadata$Age_scaled)
+# male_effects <- as.data.frame(v[,1:(3*ncol(design))])
+# colnames(male_effects) <- c('beta.intercept','beta.age','varbeta.intercept','varbeta.age','pval.intercept','pval.age')
+# 
+# for(i in 1:nrow(dge_male)){
+#   emma=emmreml(y=dge_male[i,],X=design,Z=as.matrix(z_male),K=as.matrix(male_relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#   male_effects[i,]=t(c(emma$betahat,emma$varbetahat,emma$pvalbeta[,"none"]))
+# }
+# 
+# hist(male_effects$pval.age,breaks=50)
+# summary(male_effects$pval.age < 0.05, na.rm = T)
+# male_effects$qval <- qvalue(male_effects$pval.age)$qvalues
+# summary(male_effects$qval < 0.2, na.rm = T)
+# summary(male_effects$qval < 0.05, na.rm = T)
+```
+
+```{r}
+# iters = 100
+# for(iter in 1:iters){
+#   print(iter)
+#   #Permute Age among the set of samples flagged as F (one sample per individual)
+#   male_random=sample(male_metadata$Age_scaled)
+#   design = model.matrix(~male_random)
+#   
+#   res_null=dge_male[,1:(ncol(design))]
+#   colnames(res_null)[1:ncol(design)]=paste0("p_value_age")
+#   #Fit a model for each gene using emmreml
+#   for(i in 1:nrow(dge_male))
+#   {
+#     emma=emmreml(y=dge_male[i,],X=design,Z=as.matrix(z_male),K=as.matrix(male_relatedness),varbetahat=T,varuhat=T,PEVuhat=T,test=T)
+#     res_null[i,]=t(c(emma$pvalbeta[,"none"]))
+#   }
+#   if(iter==1)
+#   {
+#     shuffled_male_pvals <-data.frame(x=res_null[,"p_value_age"])
+#     rownames(shuffled_male_pvals)=rownames(res_null)
+#   } else {
+#     shuffled_male_pvals <- cbind(shuffled_male_pvals,x=res_null[,"p_value_age"])
+#   }
+# }
+```
+
+```{r}
+# MaleEffects_FDR <- perm.fdr(data.frame(male_effects),shuffled_male_pvals,"pval.age","AgeFDR")
+# MaleEffects_FDR
+# summary(MaleEffects_FDR$fdr_AgeFDR < 0.2)
+# MaleEffects_FDR[MaleEffects_FDR$fdr_AgeFDR < 0.2, c('fdr_AgeFDR')]
+# summary(MaleEffects_FDR$fdr_AgeFDR < 0.5)
+# MaleEffects_FDR[MaleEffects_FDR$fdr_AgeFDR < 0.5, c('fdr_AgeFDR')]
+# summary(MaleEffects_FDR$p_value_age < 0.05)
+# summary(MaleEffects_FDR$qval < 0.2)
+# 
+# colnames(shuffled_male_pvals) <- 1:100
+# tmp1 <- reshape2::melt(shuffled_male_pvals)
+# ggplot() + geom_density(aes(x=tmp1$value)) + theme(legend.position = "none")
+```
+

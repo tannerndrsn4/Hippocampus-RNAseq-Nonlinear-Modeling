@@ -1,0 +1,346 @@
+---
+title: "RNASeq GO Analysis"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(enrichR)
+listEnrichrSites()
+setEnrichrSite("Enrichr") # Human genes
+```
+
+```{r}
+websiteLive <- TRUE
+dbs <- listEnrichrDbs()
+if (is.null(dbs)) websiteLive <- FALSE
+if (websiteLive) head(dbs)
+```
+
+```{r}
+#cov_cluster1
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster1_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster1_Enrichr_GOBP.csv")
+
+cov1_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value", title = NULL)
+cov1_plot
+
+ggsave(filename = "Cov1_BP.pdf", cov1_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster1_Enrichr_KEGG.csv")
+
+cov1_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov1_plot
+
+ggsave(filename = "Cov1_KEGG.pdf", cov1_plot)
+
+#cov_cluster2
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster2_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster2_Enrichr_GOBP.csv")
+
+cov2_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov2_plot
+
+ggsave(filename = "Cov2_BP.pdf", cov2_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster2_Enrichr_KEGG.csv")
+
+cov2_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov2_plot
+
+ggsave(filename = "Cov2_KEGG.pdf", cov2_plot)
+
+#cov_cluster3
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster3_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster3_Enrichr_GOBP.csv")
+
+cov3_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov3_plot
+
+ggsave(filename = "Cov3_BP.pdf", cov3_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster3_Enrichr_KEGG.csv")
+
+cov3_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov3_plot
+
+ggsave(filename = "Cov3_KEGG.pdf", cov3_plot)
+
+#cov_cluster4
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster4_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster4_Enrichr_GOBP.csv")
+
+cov4_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov4_plot
+
+ggsave(filename = "Cov4_BP.pdf", cov4_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster4_Enrichr_KEGG.csv")
+
+cov4_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov4_plot
+
+ggsave(filename = "Cov4_KEGG.pdf", cov4_plot)
+```
+
+```{r}
+#female_cluster1
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(female_cluster1_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "female_cluster1_Enrichr_GOBP.csv")
+
+female1_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female1_plot
+
+ggsave(filename = "Female1_BP.pdf", female1_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "female_cluster1_Enrichr_KEGG.csv")
+
+female1_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female1_plot
+
+ggsave(filename = "Female1_KEGG.pdf", female1_plot)
+
+#female_cluster2
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(female_cluster2_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "female_cluster2_Enrichr_GOBP.csv")
+
+female2_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female2_plot
+
+ggsave(filename = "Female2_BP.pdf", female2_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "female_cluster2_Enrichr_KEGG.csv")
+
+female2_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female2_plot
+
+ggsave(filename = "Female2_KEGG.pdf", female2_plot)
+
+#female_cluster3
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(female_cluster3_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "female_cluster3_Enrichr_GOBP.csv")
+
+female3_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female3_plot
+
+ggsave(filename = "Female3_BP.pdf", female3_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "female_cluster3_Enrichr_KEGG.csv")
+
+female3_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female3_plot
+
+ggsave(filename = "Female3_KEGG.pdf", female3_plot)
+
+#female_cluster4
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(female_cluster4_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "female_cluster4_Enrichr_GOBP.csv")
+
+female4_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female4_plot
+
+ggsave(filename = "Female4_BP.pdf", female4_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "female_cluster4_Enrichr_KEGG.csv")
+
+female4_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+female4_plot
+
+ggsave(filename = "Female4_KEGG.pdf", female4_plot)
+```
+
+```{r}
+#male_cluster1
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(male_cluster1_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "male_cluster1_Enrichr_GOBP.csv")
+
+male1_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male1_plot
+
+ggsave(filename = "Male1_BP.pdf", male1_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "male_cluster1_Enrichr_KEGG.csv")
+
+male1_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male1_plot
+
+ggsave(filename = "Male1_KEGG.pdf", male1_plot)
+
+#male_cluster2
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(male_cluster2_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "male_cluster2_Enrichr_GOBP.csv")
+
+male2_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+
+ggsave(filename = "Male2_BP.pdf", male2_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "male_cluster2_Enrichr_KEGG.csv")
+
+male2_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male2_plot
+
+ggsave(filename = "Male2_KEGG.pdf", male2_plot)
+
+#male_cluster3
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(male_cluster3_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "male_cluster3_Enrichr_GOBP.csv")
+
+male3_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male3_plot
+
+ggsave(filename = "Male3_BP.pdf", male3_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "male_cluster3_Enrichr_KEGG.csv")
+
+male3_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male3_plot
+
+ggsave(filename = "Male3_KEGG.pdf", male3_plot)
+
+#male_cluster4
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(male_cluster4_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "male_cluster4_Enrichr_GOBP.csv")
+
+male4_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male4_plot
+
+ggsave(filename = "Male4_BP.pdf", male4_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "male_cluster4_Enrichr_KEGG.csv")
+
+male4_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 20, numChar = 40, y = "Count", orderBy = "P.value")
+male4_plot
+
+ggsave(filename = "Male4_KEGG.pdf", male4_plot)
+```
+
+Attempting TopGO approach for generating gene ontology results 
+```{r}
+# Create biomaRt object
+library(biomaRt)
+mmul_mart <- biomaRt::useMart(biomart = "ENSEMBL_MART_ENSEMBL",
+                              dataset = "mmulatta_gene_ensembl", 
+                              host = "www.ensembl.org")
+# Create biomaRt object with each genes' associated GO terms
+mmul_GO <- biomaRt::getBM(attributes = c('ensembl_gene_id','go_id','name_1006','external_gene_name'),
+                          filters = 'ensembl_gene_id',
+                          values = row.names(resid_counts), 
+                          mart = mmul_mart,
+                          uniqueRows = TRUE)
+
+# Make list of genes and associated GO IDs
+gene_ID2GO <- lapply(unique(mmul_GO$ensembl_gene_id),
+                     function(x){sort(mmul_GO[mmul_GO$ensembl_gene_id == x,
+                                              'go_id'])})
+names(gene_ID2GO) <- unique(mmul_GO$ensembl_gene_id)
+
+allGene <- as.vector(cov_cluster1_names$gene)
+# Gene Ontology enrichment analysis
+library(topGO)
+go_data = new(Class = 'topGOdata',
+              description='Simple session',
+              ontology='BP',
+              allGenes= allGene,
+              geneSelectionFun=function(x) x > 0,
+              nodeSize = 10,
+              annotationFun = annFUN.gene2GO, 
+              gene2GO = gene_ID2GO)
+go_results_fisher<-runTest(go_data,
+                           algorithm='weight01',
+                           statistic='fisher')
+top_nodes <- max(go_results_fisher@geneData[4])
+go_results_table <- GenTable(go_data,
+                             FET.weight01 = go_results_fisher,
+                             orderBy = 'FET.weight01',
+                             ranksOf = 'FET.weight01',
+                             topNodes = top_nodes,
+                             numChar = 60)
+go_results_table$padj <- p.adjust(go_results_table$FET.weight01, method = "BH")
+```

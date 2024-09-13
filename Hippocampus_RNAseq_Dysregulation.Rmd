@@ -1,0 +1,1032 @@
+---
+title: "Hippocampus RNAseq Dysregulation"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+# read/process relatedness matrix
+relatedness <- read.csv('relatedness_matrix.csv')
+rownames(relatedness) <- relatedness$X
+relatedness$X <- NULL
+colnames(relatedness) <- rownames(relatedness)
+
+#Load in count matrix 
+counts <- read.table('output.txt')
+rownames(counts) <- counts$V1
+counts$V1 <- NULL
+colnames(counts) <- colnames(relatedness)
+counts <- counts[2:34607,]
+genes <- rownames(counts)
+counts <- as.matrix(sapply(counts, as.numeric))
+rownames(counts) <- genes
+
+covariates <- read.csv('BrainSampleMetadata_RNASeq_22.csv')
+covariates$Age_scaled <- scale(as.numeric(covariates$Age,scale=F, center=T))
+covariates$SubjectID <- as.character(covariates$SubjectID)
+covariates$Group <- as.factor(covariates$Group)
+covariates$Age <- as.numeric(covariates$Age)
+covariates <- rename_with(covariates, tolower)
+covariates <- dplyr::rename(covariates, sampid = subjectid)
+head(covariates)
+```
+
+```{r}
+library(edgeR)
+#filtering and normalization
+dge <- DGEList(counts = counts, group = covariates$age)
+keep <- rowSums(cpm(counts, prior.count = 0.25, log = T) > 4) >= 15
+table(keep)
+dge <- dge[keep,,keep.lib.sizes=FALSE]
+dge_TMM <- calcNormFactors(dge)
+
+design <- model.matrix(~covariates$sex + covariates$age)
+colnames(design) <- c('intercept','Sex','Age')
+v <- voom(dge_TMM, design)
+v <- subset(v$E)
+v <- na.omit(v)
+
+#remove 8 individuals from analysis that were outliers & had choroid plexus contamination
+omit <- c("20267", "23298", "27796", "27381", "20616", "20698", "24699", "18621")
+covariates <- filter(covariates, !(sampid %in% omit))
+new_relatedness <- relatedness[c(covariates$sampid),c(covariates$sampid)]
+v <- subset(v, select = c(covariates$sampid))
+```
+
+```{r}
+df_shuffled=transform( covariates, chip = sample(chip))
+covariates$sampid <- as.factor(covariates$sampid)
+typeof(covariates$sampid)
+
+```
+
+
+```{r}
+library(variancePartition)
+
+form <- ~ age + sex + chip 
+#form <- ~ age
+
+varPart <- fitExtractVarPartModel( v, form, covariates )
+
+```
+
+```{r}
+# sort variables (i.e. columns) by median fraction
+# of variance explained
+
+vp <- sortCols( varPart )
+#varPart <- as.data.frame(varPart)
+#vp <- sort(varPart$Residuals, decreasing = FALSE)
+
+# Figure 1a
+# Bar plot of variance fractions for the first 10 genes
+plotPercentBars( vp[1:10,] )
+#
+# Figure 1b
+# violin plot of contribution of each variable to total variance
+plotVarPart( vp )
+
+```
+```{r}
+design <- model.matrix(~covariates$chip)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+form <- ~ age + sex 
+#form <- ~ age
+
+varPart <- fitExtractVarPartModel( resid_counts, form, covariates )
+
+# sort variables (i.e. columns) by median fraction
+# of variance explained
+
+vp <- sortCols( varPart )
+#varPart <- as.data.frame(varPart)
+#vp <- sort(varPart$Residuals, decreasing = FALSE)
+
+# Figure 1a
+# Bar plot of variance fractions for the first 10 genes
+plotPercentBars( vp[1:10,] )
+#
+# Figure 1b
+# violin plot of contribution of each variable to total variance
+plotVarPart( vp )
+
+```
+
+```{r}
+# genes_up_fig <- as.data.frame(v['SERPINA3',])
+# genes_up_fig$age <- covariates$age
+# colnames(genes_up_fig)[1] <- c('SERPINA3')
+# 
+# ggplot(genes_up_fig, aes(x=age, y=SERPINA3)) +
+#    geom_point() +
+#    geom_smooth(method='lm',aes(x=age, y=SERPINA3), fullrange=T, se=F) +
+#    ylab('Normalized read counts') +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+
+
+```
+
+```{r}
+# library(ggplot2)
+# load("NewAgeEMMREML.RData")
+# 
+# #### extract residuals from our model of interest
+# design <- model.matrix(~covariates$chip + covariates$sex)
+# fit <-lmFit(v,design)
+# fit <- eBayes(fit)
+# resid_counts <-residuals.MArrayLM(object=fit, v)
+# resid_counts <-resid_counts[order(rownames(resid_counts)),]
+# resid_counts <- na.omit(resid_counts)
+# 
+# 
+# #corr <- cor.test(x=resid_counts, y=covariates$age, method = 'spearman')
+```
+
+
+```{r}
+# library(samr)
+# resid_counts <- abs(resid_counts)
+# ages <- covariates$age
+# #corr <- SAMseq(resid_counts, ages, resp.type="Quantitative", nperms = 100, random.seed = NULL, nresamp = 20, fdr.output = 0.10)
+# 
+# # for (val in nrow(resid_counts)) {
+# # corr <- cor.test(x=val, y=ages, method = 'spearman')
+# # }
+# 
+# #corr <- cor.test(x=resid_counts, y=covariates$age, method = 'spearman')
+# 
+# #apply(resid_counts, 1, )
+# 
+# typeof(ages)
+```
+
+```{r}
+# # for (val in nrow(resid_counts)) {
+# # corr <- cor.test(x=val, y=ages, method = 'spearman')
+# # }
+# 
+# 
+# b = apply(resid_counts, 1, function(x) {
+#     cor.test(ages, x, method = "pearson")
+# })
+# p.vals <- sapply(b, "[[", "p.value")
+# p.vals <- sort(p.vals)
+# FDRs <- p.adjust(p.vals, "fdr")
+# library(qvalue)
+# Qvals <- qvalue(p.vals)
+# 
+# p.vals <- as.data.frame(p.vals)
+# summary(p.vals$p.vals < 0.05)
+# summary(FDRs < 0.05)
+# 
+# p.vals <- subset(p.vals, p.vals < 0.1 )
+# most_variable_genes <- rownames(p.vals)
+# 
+# var_cont_genes <- resid_counts
+```
+
+```{r}
+# #now subset our resid counts to only contain the top 10% of most variable genes 
+# #var_cont_genes <- resid_counts[rownames(resid_counts) %in% most_variable_genes, ]  # Extract rows from data
+# 
+# library(statmod)
+# #calculating our most variable genes 
+# means <- rowMeans(resid_counts)
+# vars <- apply(resid_counts,1,var)
+# cv2 <- vars/means^2
+# 
+# minMeanForFit <- unname( quantile( means[ which( cv2 > .3 ) ], .95 ) )
+# useForFit <- means >= minMeanForFit # & spikeins
+# fit <- glmgam.fit( cbind( a0 = 1, a1tilde = 1/means[useForFit] ),cv2[useForFit] )
+# a0 <- unname( fit$coefficients["a0"] )
+# a1 <- unname( fit$coefficients["a1tilde"])
+# 
+# afit <- a1/means+a0
+# varFitRatio <- vars/(afit*means^2)
+# varorder <- order(varFitRatio,decreasing=T)
+# oed <- resid_counts[varorder,]
+# variable_genes <- oed[1:957,]
+# 
+# b = apply(variable_genes, 1, function(x) {
+#     cor.test(ages, x, method = "pearson")
+# })
+# p.vals <- sapply(b, "[[", "p.value")
+# p.vals <- sort(p.vals)
+# FDRs <- p.adjust(p.vals, "fdr")
+# 
+# p.vals <- as.data.frame(p.vals)
+# summary(p.vals$p.vals < 0.05)
+# summary(FDRs < 0.05)
+# 
+# 
+# write.csv(p.vals, "Dyregulated_genes_cont.csv")
+```
+
+
+```{r}
+# #redo this analysis using a binned approach. Is gene expression more variable in individuals greater than 20 years of age?
+# age_compare <- covariates$age_compare
+# 
+# b = apply(resid_counts, 1, function(x) {
+#     cor.test(ages, x, method = "pearson")
+# 
+# p.vals <- sapply(b, "[[", "p.value")
+# p.vals <- sort(p.vals)
+# FDRs <- p.adjust(p.vals, "fdr")
+# library(qvalue)
+# Qvals <- qvalue(p.vals)
+# 
+# p.vals <- as.data.frame(p.vals)
+# summary(p.vals$p.vals < 0.05)
+# summary(p.vals$p.vals < 0.1)
+# summary(FDRs < 0.1)
+# 
+# b = apply(oed, 1, function(x) {
+#     cor.test(age_compare, x, method = "pearson")
+# })
+# p.vals <- sapply(b, "[[", "p.value")
+# p.vals <- sort(p.vals)
+# FDRs <- p.adjust(p.vals, "fdr")
+# library(qvalue)
+# Qvals <- qvalue(p.vals)
+# 
+# p.vals <- as.data.frame(p.vals)
+# summary(p.vals$p.vals < 0.05)
+# summary(p.vals$p.vals < 0.1)
+# summary(FDRs < 0.1)
+```
+
+
+```{r}
+#comparing the variance in gene expression between young and old individuals
+#var_cont_genes <- resid_counts[rownames(resid_counts) %in% most_variable_genes, ]  # Extract rows from data
+
+#### extract residuals from our model of interest
+design <- model.matrix(~covariates$chip + covariates$sex)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+library(matrixTests)
+library(readr)
+Age0 <- subset(covariates, age_compare == 0)
+Age0 <- Age0$sampid
+Age1 <- subset(covariates, age_compare == 1)
+Age1 <- Age1$sampid
+Age0 <- resid_counts[, colnames(resid_counts) %in% Age0]  # Extract columns from data
+Age1 <- resid_counts[, colnames(resid_counts) %in% Age1]  # Extract columns from data
+ftest <- row_f_var(Age0, Age1, alternative = "two.sided", conf.level = 0.95)
+summary(ftest$pvalue < 0.05)
+ftest$fdr <- p.adjust(ftest$pvalue, "fdr")
+summary(ftest$fdr < 0.05)
+binned_var_genes <- subset(ftest, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+write.csv(binned_var_genes, "binned_var_genes.csv", row.names = TRUE)
+
+```
+
+```{r}
+#comparing the variance in gene expression between 3 age classes -- young, middle and old
+
+#### extract residuals from our model of interest
+design <- model.matrix(~covariates$chip + covariates$sex)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+library(matrixTests)
+library(readr)
+Age0 <- subset(covariates, age_compare2 == 0)
+Age0 <- Age0$sampid
+Age1 <- subset(covariates, age_compare2 == 1)
+Age1 <- Age1$sampid
+Age2 <- subset(covariates, age_compare2 == 2)
+Age2 <- Age2$sampid
+
+Age0 <- resid_counts[, colnames(resid_counts) %in% Age0]  # Extract columns from data
+Age1 <- resid_counts[, colnames(resid_counts) %in% Age1]  # Extract columns from data
+Age2 <- resid_counts[, colnames(resid_counts) %in% Age2]  # Extract columns from data
+#perform f tests for each group against one another
+ftest <- row_f_var(Age0, Age1, alternative = "two.sided", conf.level = 0.95)
+summary(ftest$pvalue < 0.05)
+ftest$fdr <- p.adjust(ftest$pvalue, "fdr")
+summary(ftest$fdr < 0.05)
+binned_var_genes <- subset(ftest, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+#write.csv(binned_var_genes, "Age0xAge1_var_genes.csv", row.names = TRUE)
+
+ftest <- row_f_var(Age1, Age2, alternative = "two.sided", conf.level = 0.95)
+summary(ftest$pvalue < 0.05)
+ftest$fdr <- p.adjust(ftest$pvalue, "fdr")
+summary(ftest$fdr < 0.05)
+binned_var_genes <- subset(ftest, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+#write.csv(binned_var_genes, "Age1xAge2_var_genes.csv", row.names = TRUE)
+
+ftest <- row_f_var(Age0, Age2, alternative = "two.sided", conf.level = 0.95)
+summary(ftest$pvalue < 0.05)
+ftest$fdr <- p.adjust(ftest$pvalue, "fdr")
+summary(ftest$fdr < 0.05)
+binned_var_genes <- subset(ftest, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+#write.csv(binned_var_genes, "Age0xAge2_var_genes.csv", row.names = TRUE)
+```
+
+
+```{r}
+#Updated variance analysis for the 3 age groups while also controlling for mean expression 
+
+#### extract residuals from our model of interest
+design <- model.matrix(~covariates$chip + covariates$sex)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+#Prepare our matrcies
+Age0 <- subset(covariates, age_compare2 == 0)
+Age0 <- Age0$sampid
+Age1 <- subset(covariates, age_compare2 == 1)
+Age1 <- Age1$sampid
+Age2 <- subset(covariates, age_compare2 == 2)
+Age2 <- Age2$sampid
+
+Age0 <- resid_counts[, colnames(resid_counts) %in% Age0]  # Extract columns from data
+Age1 <- resid_counts[, colnames(resid_counts) %in% Age1]  # Extract columns from data
+Age2 <- resid_counts[, colnames(resid_counts) %in% Age2]  # Extract columns from data
+
+# Load the necessary libraries
+library(magrittr) # for piping operations
+library(matrixStats) # for calculating row means and variances
+library(matrixTests)
+library(readr)
+
+# Define function for comparing variances while controlling for mean expression
+compare_variances <- function(mat1, mat2) {
+  # Calculate row means for each matrix
+  mean1 <- rowMeans(mat1)
+  mean2 <- rowMeans(mat2)
+  
+  # Subset the matrices to keep only genes with similar mean expression levels
+  threshold <- 0.5 # threshold for controlling mean expression
+  common_genes <- which(abs(mean1 - mean2) < threshold)
+  mat1_common <- mat1[common_genes, ]
+  mat2_common <- mat2[common_genes, ]
+  
+  # Calculate F-test for each gene
+  f_stats <- row_f_var(mat1_common, mat2_common, alternative = "two.sided", conf.level = 0.95)
+  f_stats$fdr <- p.adjust(f_stats$pvalue, "fdr")
+  
+  return(f_stats)
+}
+
+Age0xAge1 <- compare_variances(Age0, Age1)
+Age1xAge2 <- compare_variances(Age1, Age2)
+Age0xAge2 <- compare_variances(Age0, Age2)
+
+write.csv(Age0xAge1, "Age0xAge1_var_genes.csv", row.names = TRUE)
+write.csv(Age1xAge2, "Age1xAge2_var_genes.csv", row.names = TRUE)
+write.csv(Age0xAge2, "Age0xAge2_var_genes.csv", row.names = TRUE)
+
+###This script defines a function compare_variances that takes two matrices mat1 and mat2 as input, and compares the variances for each gene between the matrices using F-tests while controlling for mean gene expression. The function first calculates the mean expression level for each gene in each matrix, and subsets the matrices to keep only genes with similar mean expression levels (controlled by the threshold parameter). Then, for each gene, it applies f_tests to calculate the F-statistic and p-value for the comparison between the two matrices. The function also calculates the fdr for each F-statistic and returns these values in the form of a data frame. 
+```
+
+
+```{r}
+#Checking the output of our variance test
+summary(Age0xAge1$fdr < 0.05)
+binned_var_genes <- subset(Age0xAge1, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+summary(Age1xAge2$fdr < 0.05)
+binned_var_genes <- subset(Age1xAge2, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+summary(Age0xAge2$fdr < 0.05)
+binned_var_genes <- subset(Age0xAge2, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+#a var ratio < 1 means that variance is greater in the first age group compared to the second
+```
+
+```{r}
+library(ggplot2)
+
+# Create a data frame with FDR values and significant genes
+results_df <- data.frame(Gene = rownames(Age0xAge1),
+                         FDR = Age0xAge1$fdr,
+                         GroupWithHigherVariance = ifelse(Age0xAge1$var.ratio > 1, "Age0", "Age1"))
+
+# Subset the data frame to include only significant genes
+results_df <- results_df[results_df$FDR < 0.05, ]
+
+# Count the number of significant genes in each group
+significant_counts <- table(results_df$GroupWithHigherVariance)
+
+# Create a summary data frame for plotting
+summary_df <- data.frame(GroupWithHigherVariance = names(significant_counts),
+                         Counts = as.numeric(significant_counts))
+
+# Create a bar plot to summarize the results
+ggplot(data = summary_df, aes(x = GroupWithHigherVariance, y = Counts, fill = GroupWithHigherVariance)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Age group", y = "Genes with greater variance in expression") +
+  scale_fill_manual(values = c("Age0" = "blue", "Age1" = "red")) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  geom_text(aes(label = Counts), vjust = -0.5) +
+  ylim(0,900)
+
+
+# Create a data frame with FDR values and significant genes
+results_df <- data.frame(Gene = rownames(Age1xAge2),
+                         FDR = Age1xAge2$fdr,
+                         GroupWithHigherVariance = ifelse(Age1xAge2$var.ratio > 1, "Age1", "Age2"))
+
+# Subset the data frame to include only significant genes
+results_df <- results_df[results_df$FDR < 0.05, ]
+
+# Count the number of significant genes in each group
+significant_counts <- table(results_df$GroupWithHigherVariance)
+
+# Create a summary data frame for plotting
+summary_df <- data.frame(GroupWithHigherVariance = names(significant_counts),
+                         Counts = as.numeric(significant_counts))
+
+# Create a bar plot to summarize the results
+ggplot(data = summary_df, aes(x = GroupWithHigherVariance, y = Counts, fill = GroupWithHigherVariance)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Age group", y = "Genes with greater variance in expression") +
+  scale_fill_manual(values = c("Age1" = "#009E73", "Age2" = "#D55E00")) +
+  theme_minimal() +
+  theme(legend.position = "none") +
+  geom_text(aes(label = Counts), vjust = -0.5) +
+  ylim(0,350)
+
+```
+
+```{r}
+#run basic ontology enrichment analysis on these genes
+
+midage <- results_df[results_df$GroupWithHigherVariance == "Age1", ]
+oldage <- results_df[results_df$GroupWithHigherVariance == "Age2", ]
+
+library(enrichR)
+listEnrichrSites()
+setEnrichrSite("Enrichr") # Human genes
+websiteLive <- TRUE
+dbs <- listEnrichrDbs()
+if (is.null(dbs)) websiteLive <- FALSE
+if (websiteLive) head(dbs)
+
+
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(midage$Gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "midage_Enrichr_GOBP.csv")
+
+midage_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value", title = NULL)
+midage_plot
+
+ggsave(filename = "midage_BP.pdf", midage_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "midage_Enrichr_KEGG.csv")
+
+midage_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+midage_plot
+
+ggsave(filename = "midage_KEGG.pdf", midage_plot)
+
+
+
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(oldage$Gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "oldage_Enrichr_GOBP.csv")
+
+oldage_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value", title = NULL)
+oldage_plot
+
+ggsave(filename = "oldage_BP.pdf", oldage_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "oldage_Enrichr_KEGG.csv")
+
+oldage_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+oldage_plot
+
+ggsave(filename = "oldage_KEGG.pdf", oldage_plot)
+```
+
+```{r}
+#Four genes that have an FDR < 0.1
+
+# genes_up_fig <- as.data.frame(v['UBR4',])
+# genes_up_fig$age <- covariates$age
+# colnames(genes_up_fig)[1] <- c('UBR4')
+# 
+# ggplot(genes_up_fig, aes(x=age, y=UBR4)) +
+#    geom_point() +
+#    labs(title = "UBR4") +
+#    geom_smooth(method='lm',aes(x=age, y=UBR4), fullrange=T, se=F) +
+#    ylab('Normalized read counts') +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+# 
+# ggplot(genes_up_fig, aes(x=UBR4, y=age)) +
+#    geom_violin() +
+#    labs(title = "UBR4") +
+#    ylab('Age') +
+#    xlim(0,8) +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['UBR4',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('UBR4')
+
+ggplot(genes_up_fig, aes(x=age, y=UBR4)) +
+   geom_point() +
+   labs(title = "UBR4") +
+   geom_smooth(method='lm',aes(x=age, y=UBR4), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+ggplot(genes_up_fig, aes(x=UBR4, y=age)) +
+   geom_violin() +
+   labs(title = "UBR4") +
+   ylab('Age') +
+   xlim(0,8) +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+
+# genes_up_fig <- as.data.frame(v['YEATS2',])
+# genes_up_fig$age <- covariates$age
+# colnames(genes_up_fig)[1] <- c('YEATS2')
+# 
+# ggplot(genes_up_fig, aes(x=age, y=YEATS2)) +
+#    geom_point() +
+#    labs(title = "YEATS2") +
+#    geom_smooth(method='lm',aes(x=age, y=YEATS2), fullrange=T, se=F) +
+#    ylab('Normalized read counts') +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+# 
+# ggplot(genes_up_fig, aes(x=YEATS2, y=age)) +
+#    geom_violin() +
+#    labs(title = "YEATS2") +
+#    ylab('Age') +
+#    xlim(0,8) +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['YEATS2',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('YEATS2')
+
+ggplot(genes_up_fig, aes(x=age, y=YEATS2)) +
+   geom_point() +
+   labs(title = "YEATS2") +
+   geom_smooth(method='lm',aes(x=age, y=YEATS2), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+ggplot(genes_up_fig, aes(x=YEATS2, y=age)) +
+   geom_violin() +
+   labs(title = "YEATS2") +
+   ylab('Age') +
+   xlim(0,8) +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+# genes_up_fig <- as.data.frame(v['LOC720132',])
+# genes_up_fig$age <- covariates$age
+# colnames(genes_up_fig)[1] <- c('LOC720132')
+# 
+# ggplot(genes_up_fig, aes(x=age, y=LOC720132)) +
+#    geom_point() +
+#    labs(title = "LOC720132") +
+#    geom_smooth(method='lm',aes(x=age, y=LOC720132), fullrange=T, se=F) +
+#    ylab('Normalized read counts') +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+# 
+# ggplot(genes_up_fig, aes(x=LOC720132, y=age)) +
+#    geom_violin() +
+#    labs(title = "LOC720132") +
+#    ylab('Age') +
+#    xlim(0,8) +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['LOC720132',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('LOC720132')
+
+ggplot(genes_up_fig, aes(x=age, y=LOC720132)) +
+   geom_point() +
+   labs(title = "LOC720132") +
+   geom_smooth(method='lm',aes(x=age, y=LOC720132), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+ggplot(genes_up_fig, aes(x=LOC720132, y=age)) +
+   geom_violin() +
+   labs(title = "LOC720132") +
+   ylab('Age') +
+   xlim(0,8) +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+# genes_up_fig <- as.data.frame(v['LOC704083',])
+# genes_up_fig$age <- covariates$age
+# colnames(genes_up_fig)[1] <- c('LOC704083')
+# 
+# ggplot(genes_up_fig, aes(x=age, y=LOC704083)) +
+#    geom_point() +
+#    labs(title = "LOC704083") +
+#    geom_smooth(method='lm',aes(x=age, y=LOC704083), fullrange=T, se=F) +
+#    ylab('Normalized read counts') +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+# 
+# ggplot(genes_up_fig, aes(x=LOC704083, y=age)) +
+#    geom_violin() +
+#    labs(title = "LOC704083") +
+#    ylab('Age') +
+#    xlim(0,8) +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['LOC704083',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('LOC704083')
+
+ggplot(genes_up_fig, aes(x=age, y=LOC704083)) +
+   geom_point() +
+   labs(title = "LOC704083") +
+   geom_smooth(method='lm',aes(x=age, y=LOC704083), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+ggplot(genes_up_fig, aes(x=LOC704083, y=age)) +
+   geom_violin() +
+   labs(title = "LOC704083") +
+   ylab('Age') +
+   xlim(0,8) +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+
+# genes_up_fig <- as.data.frame(v['BDNF',])
+# genes_up_fig$age <- covariates$age
+# colnames(genes_up_fig)[1] <- c('BDNF')
+# 
+# ggplot(genes_up_fig, aes(x=age, y=BDNF)) +
+#    geom_point() +
+#    labs(title = "BDNF") +
+#    geom_smooth(method='lm',aes(x=age, y=BDNF), fullrange=T, se=F) +
+#    ylab('Normalized read counts') +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+# 
+# ggplot(genes_up_fig, aes(x=BDNF, y=age)) +
+#    geom_violin() +
+#    labs(title = "BDNF") +
+#    ylab('Age') +
+#    xlim(0,8) +
+#    scale_color_brewer(palette = 'Dark2', name='Gene') +
+#    theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['BDNF',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('BDNF')
+
+ggplot(genes_up_fig, aes(x=age, y=BDNF)) +
+   geom_point() +
+   labs(title = "BDNF") +
+   geom_smooth(method='lm',aes(x=age, y=BDNF), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+ggplot(genes_up_fig, aes(x=BDNF, y=age)) +
+   geom_violin() +
+   labs(title = "BDNF") +
+   xlim(0,8) +
+   ylab('Age') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+```
+
+```{r}
+genes_up_fig <- as.data.frame(resid_counts['SCN2B',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('SCN2B')
+
+ggplot(genes_up_fig, aes(x=SCN2B, y=age)) +
+   geom_violin(fill="#999999") +
+   labs(title = "SCN2B") +
+   xlim(0,6) +
+   ylab('Age') +
+   theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['FAM126B',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('FAM126B')
+
+ggplot(genes_up_fig, aes(x=FAM126B, y=age)) +
+   geom_violin(fill="#E69F00") +
+   labs(title = "FAM126B") +
+   xlim(0,6) +
+   ylab('Age') +
+   theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['GABRA5',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('GABRA5')
+
+ggplot(genes_up_fig, aes(x=GABRA5, y=age, fill=GABRA5)) +
+   geom_violin(fill="#56B4E9") +
+   labs(title = "GABRA5") +
+   ylab('Age') +
+   theme_minimal()
+
+genes_up_fig <- as.data.frame(resid_counts['YEATS2',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('YEATS2')
+
+LOC704083 <- as.data.frame(resid_counts['LOC704083',])
+UBR4 <- as.data.frame(resid_counts['UBR4',])
+
+genes_up_fig$LOC704083 <- LOC704083$`resid_counts["LOC704083", ]`
+genes_up_fig$UBR4 <- UBR4$`resid_counts["UBR4", ]`
+
+
+genes_up_fig = melt(genes_up_fig, id=c("age"))
+
+ggplot(genes_up_fig, aes(x=value, y=age, fill=variable)) +
+  geom_violin() +
+  labs(x="Residual counts", y = "Age")+
+  theme_minimal()
+
+ggplot(genes_up_fig, aes(x=age, fill=variable)) +
+  geom_density() +
+  labs(x="Residual counts", y = "Age")+
+  theme_minimal()
+
+
+```
+
+```{r}
+genes_up_fig <- as.data.frame(v['DIDO1',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('DIDO1')
+
+ggplot(genes_up_fig, aes(x=age, y=DIDO1)) +
+   geom_point() +
+   labs(title = "DIDO1") +
+   geom_smooth(method='lm',aes(x=age, y=DIDO1), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+
+genes_up_fig <- as.data.frame(v['TNRC6C',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('TNRC6C')
+
+ggplot(genes_up_fig, aes(x=age, y=TNRC6C)) +
+   geom_point() +
+   labs(title = "TNRC6C") +
+   geom_smooth(method='lm',aes(x=age, y=TNRC6C), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+
+genes_up_fig <- as.data.frame(v['BAZ2A',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('BAZ2A')
+
+ggplot(genes_up_fig, aes(x=age, y=BAZ2A)) +
+   geom_point() +
+   labs(title = "BAZ2A") +
+   geom_smooth(method='lm',aes(x=age, y=BAZ2A), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+genes_up_fig <- as.data.frame(v['SLC15A4',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('SLC15A4')
+
+ggplot(genes_up_fig, aes(x=age, y=SLC15A4)) +
+   geom_point() +
+   labs(title = "SLC15A4") +
+   geom_smooth(method='lm',aes(x=age, y=SLC15A4), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+
+
+genes_up_fig <- as.data.frame(v['GTF3A',])
+genes_up_fig$age <- covariates$age
+colnames(genes_up_fig)[1] <- c('GTF3A')
+
+ggplot(genes_up_fig, aes(x=age, y=GTF3A)) +
+   geom_point() +
+   labs(title = "GTF3A") +
+   geom_smooth(method='lm',aes(x=age, y=GTF3A), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal()
+```
+
+```{r}
+p.vals <- subset(p.vals, p.vals < 0.05)
+#clustering analysis for dysregulation trends
+sig_genes <- resid_counts[rownames(p.vals),]
+library(tibble)
+
+clus.distance.arima = as.dist(1 - cor(t(sig_genes), use = "pa"))
+h.clust.arima = hclust(clus.distance.arima,method='complete') # calc. clusters
+
+gene_cluster <- cutree(h.clust.arima, k = 2) %>% 
+  # turn the named vector into a tibble
+  enframe() %>% 
+  # rename some of the columns
+  rename(gene = name, cluster = value)
+
+p.vals <- as.data.frame(p.vals)
+#gene_cluster$p.vals <- subset(p.vals, p.vals$ == rownames(p.vals))
+head(p.vals)
+summary(gene_cluster$cluster == 1)
+summary(gene_cluster$cluster == 2)
+summary(gene_cluster$cluster == 3)
+summary(gene_cluster$cluster == 4)
+head(gene_cluster)
+```
+
+```{r}
+Age_compare <- subset(covariates, age_compare2 %in% c(1,2))
+Age_compare <- Age_compare$sampid
+
+Age_compare <- v[, colnames(v) %in% Age_compare]  # Extract columns from data
+
+Age_compare_covariates <- subset(covariates, sampid %in% colnames(Age_compare))
+
+genes_up_fig <- as.data.frame(Age_compare['KCNC1',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('KCNC1')
+
+ggplot(genes_up_fig, aes(x=age, y=KCNC1, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "KCNC1") +
+   geom_smooth(method='lm',aes(x=age, y=KCNC1), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+
+genes_up_fig <- as.data.frame(Age_compare['CSF1R',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('CSF1R')
+
+ggplot(genes_up_fig, aes(x=age, y=CSF1R, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "CSF1R") +
+   geom_smooth(method='lm',aes(x=age, y=CSF1R), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+
+genes_up_fig <- as.data.frame(Age_compare['SELPLG',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('SELPLG')
+
+ggplot(genes_up_fig, aes(x=age, y=SELPLG, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "SELPLG") +
+   geom_smooth(method='lm',aes(x=age, y=SELPLG), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+genes_up_fig <- as.data.frame(Age_compare['TBC1D17',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('TBC1D17')
+
+ggplot(genes_up_fig, aes(x=age, y=TBC1D17, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "TBC1D17") +
+   geom_smooth(method='lm',aes(x=age, y=TBC1D17), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+genes_up_fig <- as.data.frame(Age_compare['SCN1B',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('SCN1B')
+
+ggplot(genes_up_fig, aes(x=age, y=SCN1B, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "SCN1B") +
+   geom_smooth(method='lm',aes(x=age, y=SCN1B), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+genes_up_fig <- as.data.frame(Age_compare['ZNF337',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('ZNF337')
+
+ggplot(genes_up_fig, aes(x=age, y=ZNF337, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "ZNF337") +
+   geom_smooth(method='lm',aes(x=age, y=ZNF337), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+genes_up_fig <- as.data.frame(Age_compare['ZDHHC16',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('ZDHHC16')
+
+ggplot(genes_up_fig, aes(x=age, y=ZDHHC16, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "ZDHHC16") +
+   geom_smooth(method='lm',aes(x=age, y=ZDHHC16), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+genes_up_fig <- as.data.frame(Age_compare['PHC3',])
+genes_up_fig$age <- Age_compare_covariates$age
+colnames(genes_up_fig)[1] <- c('PHC3')
+
+ggplot(genes_up_fig, aes(x=age, y=PHC3, label=rownames(genes_up_fig))) +
+   geom_point() +
+   labs(title = "PHC3") +
+   geom_smooth(method='lm',aes(x=age, y=PHC3), fullrange=T, se=F) +
+   ylab('Normalized read counts') +
+   scale_color_brewer(palette = 'Dark2', name='Gene') +
+   theme_minimal() +
+   geom_vline(xintercept=20, linetype="dotted") +
+   geom_text(hjust=0, vjust=0)
+
+```
+
+```{r}
+
+```
+
