@@ -1,0 +1,211 @@
+###rerunning the ARIMA models with regressing out the effects of sex and the chips 
+#### extract residuals from our model of interest
+design <- model.matrix(~covariates$chip + covariates$sex)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+save(resid_counts, covariates, file = "InputSexARIMA_2.RData")
+
+##Run using ARIMA function##
+
+###Next we can load the results of this model in and begin to see the output
+
+load("ARIMA_2/aging_sex_arima.RData")
+
+Covfitted_nonzero <- aging_arima$fitted.nonzero
+Covpredicted_nonzero <- aging_arima$predicted.nonzero
+
+dim(Covfitted_nonzero)
+dim(Covpredicted_nonzero)
+
+###Run hierarchical clustering and generate figures 
+library(dplyr)
+library(tidyverse)
+clus.distance.arima = as.dist(1 - cor(t(Covpredicted_nonzero), use = "pa"))
+h.clust.arima = hclust(clus.distance.arima,method='complete') # calc. clusters
+
+cov_gene_cluster <- cutree(h.clust.arima, k = 4) %>% 
+  # turn the named vector into a tibble
+  enframe() %>% 
+  # rename some of the columns
+  dplyr::rename(gene = name, cluster = value)
+
+head(cov_gene_cluster)
+sum(cov_gene_cluster$cluster == 1)
+sum(cov_gene_cluster$cluster == 2)
+sum(cov_gene_cluster$cluster == 3)
+sum(cov_gene_cluster$cluster == 4)
+
+overlapgenes <- merge(predicted_nonzero, Covpredicted_nonzero, by="row.names")
+dim(overlapgenes)
+
+Covfitted_nonzero <- as.data.frame(Covfitted_nonzero)
+Covfitted_nonzero$cluster <- cov_gene_cluster$cluster
+dim(Covfitted_nonzero)
+
+cov_cluster1_names <- subset(cov_gene_cluster, cov_gene_cluster$cluster == 1)
+cov_cluster1 <- Covfitted_nonzero[Covfitted_nonzero[,88]==1,c(1:87)]
+rownames(cov_cluster1) <- cov_cluster1_names$gene
+cov_cluster1 <- as.matrix(cov_cluster1)
+# longcluster1 <- melt(cluster1)
+# longcluster1 <- na.omit(longcluster1)
+
+par(mar=c(1,1,1,1))
+heatmap(cov_cluster1, Colv = NA, Rowv = NA)
+
+cov_cluster2_names <- subset(cov_gene_cluster, cov_gene_cluster$cluster == 2)
+cov_cluster2 <- Covfitted_nonzero[Covfitted_nonzero[,88]==2,c(1:87)]
+rownames(cov_cluster2) <- cov_cluster2_names$gene
+cov_cluster2 <- as.matrix(cov_cluster2)
+
+heatmap(cov_cluster2, Colv = NA, Rowv = NA)
+
+cov_cluster3_names <- subset(cov_gene_cluster, cov_gene_cluster$cluster == 3)
+cov_cluster3 <- Covfitted_nonzero[Covfitted_nonzero[,88]==3,c(1:87)]
+rownames(cov_cluster3) <- cov_cluster3_names$gene
+cov_cluster3 <- as.matrix(cov_cluster3)
+
+heatmap(cov_cluster3, Colv = NA, Rowv = NA)
+
+cov_cluster4_names <- subset(cov_gene_cluster, cov_gene_cluster$cluster == 4)
+cov_cluster4 <- Covfitted_nonzero[Covfitted_nonzero[,88]==4,c(1:87)]
+rownames(cov_cluster4) <- cov_cluster4_names$gene
+cov_cluster4 <- as.matrix(cov_cluster4)
+
+heatmap(cov_cluster4, Colv = NA, Rowv = NA)
+
+# write_csv(cov_cluster1_names, "CovCluster1.csv")
+# write_csv(cov_cluster2_names, "CovCluster2.csv")
+# write_csv(cov_cluster3_names, "CovCluster3.csv")
+# write_csv(cov_cluster4_names, "CovCluster4.csv")
+
+#Making plots showing temporal patterns of gene expression
+
+# Melt the data into a "long" format
+cov1_fig <- cov_cluster1
+colnames(cov1_fig) <- gsub("X", "", colnames(cov1_fig))
+gene_expression_melted <- reshape2::melt(cov1_fig, id.vars = "Gene", variable.name = "Age", value.name = "Expression")
+average_expression1 <- aggregate(Expression ~ Var2, gene_expression_melted, mean)
+
+ggplot(gene_expression_melted, aes(x = Var2, y = Expression, group = Var1, color = Var1)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_minimal() + 
+  labs(title = "Gene Expression over Time",
+       x = "Age",
+       y = "Expression trajectory")
+
+avg1 <- ggplot(average_expression1, aes(x = Var2, y = Expression)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_light() +
+  ylim(-0.3, 0.2) +
+  labs(x = "Age",
+       y = "Expression trajectory")
+avg1
+
+ggsave(filename = "CovCluster1_expression_plot.pdf", avg1)
+
+cov2_fig <- cov_cluster2
+colnames(cov2_fig) <- gsub("X", "", colnames(cov2_fig))
+gene_expression_melted <- reshape2::melt(cov2_fig, id.vars = "Gene", variable.name = "Age", value.name = "Expression")
+average_expression2 <- aggregate(Expression ~ Var2, gene_expression_melted, mean)
+
+ggplot(gene_expression_melted, aes(x = Var2, y = Expression, group = Var1, color = Var1)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_minimal() + 
+  labs(title = "Gene Expression over Time",
+       x = "Age",
+       y = "Expression trajectory")
+
+avg2 <- ggplot(average_expression2, aes(x = Var2, y = Expression)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_light() +
+  ylim(-0.3, 0.2) +
+  labs(x = "Age",
+       y = "Expression trajectory")
+avg2
+
+ggsave(filename = "CovCluster2_expression_plot.pdf", avg2)
+
+cov3_fig <- cov_cluster3
+colnames(cov3_fig) <- gsub("X", "", colnames(cov3_fig))
+gene_expression_melted <- reshape2::melt(cov3_fig, id.vars = "Gene", variable.name = "Age", value.name = "Expression")
+average_expression3 <- aggregate(Expression ~ Var2, gene_expression_melted, mean)
+
+ggplot(gene_expression_melted, aes(x = Var2, y = Expression, group = Var1, color = Var1)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_minimal() + 
+  labs(title = "Gene Expression over Time",
+       x = "Age",
+       y = "Expression trajectory")
+
+avg3 <- ggplot(average_expression3, aes(x = Var2, y = Expression)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_light() +
+  ylim(-0.3, 0.2) +
+  labs(x = "Age",
+       y = "Expression trajectory")
+avg3
+
+ggsave(filename = "CovCluster3_expression_plot.pdf", avg3)
+
+cov4_fig <- cov_cluster4
+colnames(cov4_fig) <- gsub("X", "", colnames(cov4_fig))
+gene_expression_melted <- reshape2::melt(cov4_fig, id.vars = "Gene", variable.name = "Age", value.name = "Expression")
+average_expression4 <- aggregate(Expression ~ Var2, gene_expression_melted, mean)
+
+ggplot(gene_expression_melted, aes(x = Var2, y = Expression, group = Var1, color = Var1)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_minimal() + 
+  labs(title = "Gene Expression over Time",
+       x = "Age",
+       y = "Expression trajectory")
+
+avg4 <- ggplot(average_expression4, aes(x = Var2, y = Expression)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_light() +
+  ylim(-0.3, 0.2) +
+  labs(x = "Age",
+       y = "Expression trajectory")
+avg4
+
+ggsave(filename = "CovCluster4_expression_plot.pdf", avg4)
+
+list_df = list(average_expression1, average_expression2, average_expression3, average_expression4)
+average_combined <- list_df %>% reduce(inner_join, by='Var2')
+average_melted <- reshape2::melt(average_combined, id.vars = "Var2", variable.name = "Cluster", value.name = "Expression")
+
+cov_average <- ggplot(average_melted, aes(x = Var2, y = Expression, group = Cluster, color = Cluster)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_minimal() + 
+  labs(title = "Gene Expression over Time",
+       x = "Age",
+       y = "Expression trajectory")
+plot(cov_average)
+
+ggsave(filename = "Cov_expression_plot.pdf", cov_average)
+
+list_df = list(average_expression3, average_expression4)
+average_combined <- list_df %>% reduce(inner_join, by='Var2')
+average_melted <- reshape2::melt(average_combined, id.vars = "Var2", variable.name = "Cluster", value.name = "Expression")
+
+cov_average <- ggplot(average_melted, aes(x = Var2, y = Expression, group = Cluster, color = Cluster)) +
+  geom_point(show.legend = FALSE) +
+  geom_line(show.legend = FALSE) +
+  theme_minimal() + 
+  labs(x = "Age",
+       y = "Expression trajectory")
+plot(cov_average)
+
+ggsave(filename = "CovNonlinear_expression_plot.pdf", cov_average)
