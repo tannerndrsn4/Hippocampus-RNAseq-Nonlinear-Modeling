@@ -1,0 +1,160 @@
+library(enrichR)
+listEnrichrSites()
+setEnrichrSite("Enrichr") # Human genes
+
+websiteLive <- TRUE
+dbs <- listEnrichrDbs()
+if (is.null(dbs)) websiteLive <- FALSE
+if (websiteLive) head(dbs)
+
+#cov_cluster1
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster1_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster1_Enrichr_GOBP.csv")
+
+cov1_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value", title = NULL)
+cov1_plot
+
+ggsave(filename = "Cov1_BP.pdf", cov1_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster1_Enrichr_KEGG.csv")
+
+cov1_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov1_plot
+
+ggsave(filename = "Cov1_KEGG.pdf", cov1_plot)
+
+#cov_cluster2
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster2_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster2_Enrichr_GOBP.csv")
+
+cov2_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov2_plot
+
+ggsave(filename = "Cov2_BP.pdf", cov2_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster2_Enrichr_KEGG.csv")
+
+cov2_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov2_plot
+
+ggsave(filename = "Cov2_KEGG.pdf", cov2_plot)
+
+#cov_cluster3
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster3_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster3_Enrichr_GOBP.csv")
+
+cov3_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov3_plot
+
+ggsave(filename = "Cov3_BP.pdf", cov3_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster3_Enrichr_KEGG.csv")
+
+cov3_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov3_plot
+
+ggsave(filename = "Cov3_KEGG.pdf", cov3_plot)
+
+#cov_cluster4
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(cov_cluster4_names$gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "cov_cluster4_Enrichr_GOBP.csv")
+
+cov4_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov4_plot
+
+ggsave(filename = "Cov4_BP.pdf", cov4_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "cov_cluster4_Enrichr_KEGG.csv")
+
+cov4_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+cov4_plot
+
+ggsave(filename = "Cov4_KEGG.pdf", cov4_plot)
+
+#run basic ontology enrichment analysis on dysreglation results
+
+midage <- results_df[results_df$GroupWithHigherVariance == "Age1", ]
+oldage <- results_df[results_df$GroupWithHigherVariance == "Age2", ]
+
+library(enrichR)
+listEnrichrSites()
+setEnrichrSite("Enrichr") # Human genes
+websiteLive <- TRUE
+dbs <- listEnrichrDbs()
+if (is.null(dbs)) websiteLive <- FALSE
+if (websiteLive) head(dbs)
+
+
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(midage$Gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "midage_Enrichr_GOBP.csv")
+
+midage_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value", title = NULL)
+midage_plot
+
+ggsave(filename = "midage_BP.pdf", midage_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "midage_Enrichr_KEGG.csv")
+
+midage_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+midage_plot
+
+ggsave(filename = "midage_KEGG.pdf", midage_plot)
+
+
+
+dbs <- c("GO_Biological_Process_2021", "KEGG_2021_Human")
+if (websiteLive) {
+    enriched <- enrichr(oldage$Gene, dbs)
+}
+
+
+table <- if (websiteLive) enriched[["GO_Biological_Process_2021"]]
+write_csv(table, "oldage_Enrichr_GOBP.csv")
+
+oldage_plot <- if (websiteLive) plotEnrich(enriched[[1]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value", title = NULL)
+oldage_plot
+
+ggsave(filename = "oldage_BP.pdf", oldage_plot)
+
+table <- if (websiteLive) enriched[["KEGG_2021_Human"]]
+write_csv(table, "oldage_Enrichr_KEGG.csv")
+
+oldage_plot <- if (websiteLive) plotEnrich(enriched[[2]], showTerms = 10, numChar = 40, y = "Count", orderBy = "P.value")
+oldage_plot
+
+ggsave(filename = "oldage_KEGG.pdf", oldage_plot)
