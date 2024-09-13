@@ -1,0 +1,93 @@
+library(variancePartition)
+
+form <- ~ age + sex + chip 
+#form <- ~ age
+
+varPart <- fitExtractVarPartModel( v, form, covariates )
+
+# sort variables (i.e. columns) by median fraction
+# of variance explained
+
+vp <- sortCols( varPart )
+#varPart <- as.data.frame(varPart)
+#vp <- sort(varPart$Residuals, decreasing = FALSE)
+
+# Figure 1a
+# Bar plot of variance fractions for the first 10 genes
+plotPercentBars( vp[1:10,] )
+#
+# Figure 1b
+# violin plot of contribution of each variable to total variance
+plotVarPart( vp )
+
+#Updated variance analysis for the 3 age groups while also controlling for mean expression 
+
+#### extract residuals from our model of interest
+design <- model.matrix(~covariates$chip + covariates$sex)
+fit <-lmFit(v,design)
+fit <- eBayes(fit)
+resid_counts <-residuals.MArrayLM(object=fit, v)
+resid_counts <-resid_counts[order(rownames(resid_counts)),]
+resid_counts <- na.omit(resid_counts)
+
+#Prepare our matrcies
+Age0 <- subset(covariates, age_compare2 == 0)
+Age0 <- Age0$sampid
+Age1 <- subset(covariates, age_compare2 == 1)
+Age1 <- Age1$sampid
+Age2 <- subset(covariates, age_compare2 == 2)
+Age2 <- Age2$sampid
+
+Age0 <- resid_counts[, colnames(resid_counts) %in% Age0]  # Extract columns from data
+Age1 <- resid_counts[, colnames(resid_counts) %in% Age1]  # Extract columns from data
+Age2 <- resid_counts[, colnames(resid_counts) %in% Age2]  # Extract columns from data
+
+# Load the necessary libraries
+library(magrittr) # for piping operations
+library(matrixStats) # for calculating row means and variances
+library(matrixTests)
+library(readr)
+
+# Define function for comparing variances while controlling for mean expression
+compare_variances <- function(mat1, mat2) {
+  # Calculate row means for each matrix
+  mean1 <- rowMeans(mat1)
+  mean2 <- rowMeans(mat2)
+  
+  # Subset the matrices to keep only genes with similar mean expression levels
+  threshold <- 0.5 # threshold for controlling mean expression
+  common_genes <- which(abs(mean1 - mean2) < threshold)
+  mat1_common <- mat1[common_genes, ]
+  mat2_common <- mat2[common_genes, ]
+  
+  # Calculate F-test for each gene
+  f_stats <- row_f_var(mat1_common, mat2_common, alternative = "two.sided", conf.level = 0.95)
+  f_stats$fdr <- p.adjust(f_stats$pvalue, "fdr")
+  
+  return(f_stats)
+}
+
+Age0xAge1 <- compare_variances(Age0, Age1)
+Age1xAge2 <- compare_variances(Age1, Age2)
+Age0xAge2 <- compare_variances(Age0, Age2)
+
+write.csv(Age0xAge1, "Age0xAge1_var_genes.csv", row.names = TRUE)
+write.csv(Age1xAge2, "Age1xAge2_var_genes.csv", row.names = TRUE)
+write.csv(Age0xAge2, "Age0xAge2_var_genes.csv", row.names = TRUE)
+
+###This script defines a function compare_variances that takes two matrices mat1 and mat2 as input, and compares the variances for each gene between the matrices using F-tests while controlling for mean gene expression. The function first calculates the mean expression level for each gene in each matrix, and subsets the matrices to keep only genes with similar mean expression levels (controlled by the threshold parameter). Then, for each gene, it applies f_tests to calculate the F-statistic and p-value for the comparison between the two matrices. The function also calculates the fdr for each F-statistic and returns these values in the form of a data frame.
+
+#Checking the output of our variance test
+summary(Age0xAge1$fdr < 0.05)
+binned_var_genes <- subset(Age0xAge1, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+summary(Age1xAge2$fdr < 0.05)
+binned_var_genes <- subset(Age1xAge2, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+summary(Age0xAge2$fdr < 0.05)
+binned_var_genes <- subset(Age0xAge2, fdr < 0.05)
+summary(binned_var_genes$var.ratio > 1)
+
+#a var ratio < 1 means that variance is greater in the first age group compared to the second
