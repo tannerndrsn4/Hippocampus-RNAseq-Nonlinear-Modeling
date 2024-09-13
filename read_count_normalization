@@ -1,0 +1,46 @@
+# Load data - need residual counts matrix (removing technical effects) and metadata
+library(dplyr)
+library(edgeR)
+# read/process relatedness matrix
+relatedness <- read.csv('relatedness_matrix.csv')
+rownames(relatedness) <- relatedness$X
+relatedness$X <- NULL
+colnames(relatedness) <- rownames(relatedness)
+
+#Load in count matrix 
+counts <- read.table('output.txt')
+rownames(counts) <- counts$V1
+counts$V1 <- NULL
+colnames(counts) <- colnames(relatedness)
+counts <- counts[2:34607,]
+genes <- rownames(counts)
+counts <- as.matrix(sapply(counts, as.numeric))
+rownames(counts) <- genes
+
+covariates <- read.csv('BrainSampleMetadata_RNASeq_22.csv')
+covariates$Age_scaled <- scale(as.numeric(covariates$Age,scale=F, center=T))
+covariates$SubjectID <- as.character(covariates$SubjectID)
+covariates$Group <- as.factor(covariates$Group)
+covariates$Lane <- as.factor(covariates$Lane)
+covariates <- rename_with(covariates, tolower)
+colnames(covariates)[1] <- "sampid"
+head(covariates)
+
+#filtering and normalization
+dge <- DGEList(counts = counts, group = covariates$age)
+keep <- rowSums(cpm(counts, prior.count = 0.25, log = T) > 4) >= 15
+table(keep)
+dge <- dge[keep,,keep.lib.sizes=FALSE]
+dge_TMM <- calcNormFactors(dge)
+
+design <- model.matrix(~covariates$sex + covariates$age)
+colnames(design) <- c('intercept','Sex','Age')
+v <- voom(dge_TMM, design)
+v <- subset(v$E)
+v <- na.omit(v)
+
+#remove 8 individuals from analysis that were outliers & had choroid plexus contamination
+omit <- c("20267", "23298", "27796", "27381", "20616", "20698", "24699", "18621")
+covariates <- filter(covariates, !(sampid %in% omit))
+new_relatedness <- relatedness[c(covariates$sampid),c(covariates$sampid)]
+v <- subset(v, select = c(covariates$sampid))
