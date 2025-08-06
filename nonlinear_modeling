@@ -319,3 +319,182 @@ cov_average <- ggplot(average_melted, aes(x = Var2, y = Expression, group = Clus
 plot(cov_average)
 
 ggsave(filename = "CovNonlinear_expression_plot.pdf", cov_average)
+
+cov1_fig <- cov_cluster1
+colnames(cov1_fig) <- gsub("X", "", colnames(cov1_fig))
+gene_expression_melted <- reshape2::melt(cov1_fig, id.vars = "Gene")
+
+# Rename columns for clarity
+colnames(gene_expression_melted) <- c("Gene", "Age", "Expression")
+gene_expression_melted$Age <- as.numeric(as.character(gene_expression_melted$Age))
+
+# Compute summary stats
+summary_stats <- gene_expression_melted %>%
+  group_by(Age) %>%
+  summarise(mean_expr = mean(Expression),
+            sd_expr = sd(Expression),
+            .groups = 'drop')
+
+# Plot: smooth line with shaded variance
+avg1_smooth <- ggplot(summary_stats, aes(x = Age, y = mean_expr)) +
+  geom_ribbon(aes(ymin = mean_expr - sd_expr, ymax = mean_expr + sd_expr), fill = "gray80", alpha = 0.5) +
+  geom_smooth(se = FALSE, color = "#2b8cbe", method = "loess", size = 1.2) +
+  theme_classic() +
+  labs(x = "Age",
+       y = "Expression trajectory") +
+  ylim(-0.5, 0.5) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 16))
+
+print(avg1_smooth)
+ggsave("CovCluster1_smooth_expression_plot.pdf", avg1_smooth)
+
+#Cov 2 Fig
+# Keep your original prep
+cov2_fig <- cov_cluster2
+colnames(cov2_fig) <- gsub("X", "", colnames(cov2_fig))
+gene_expression_melted <- reshape2::melt(cov2_fig, id.vars = "Gene")
+
+# Rename columns for clarity
+colnames(gene_expression_melted) <- c("Gene", "Age", "Expression")
+gene_expression_melted$Age <- as.numeric(as.character(gene_expression_melted$Age))
+
+# Compute summary stats
+summary_stats <- gene_expression_melted %>%
+  group_by(Age) %>%
+  summarise(mean_expr = mean(Expression),
+            sd_expr = sd(Expression),
+            .groups = 'drop')
+
+# Plot: smooth line with shaded variance
+avg2_smooth <- ggplot(summary_stats, aes(x = Age, y = mean_expr)) +
+  geom_ribbon(aes(ymin = mean_expr - sd_expr, ymax = mean_expr + sd_expr), fill = "gray80", alpha = 0.5) +
+  geom_smooth(se = FALSE, color = "#2b8cbe", method = "loess", size = 1.2) +
+  theme_classic() +
+  labs(x = "Age",
+       y = "Expression trajectory") +
+  ylim(-0.5, 0.5) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 16))
+
+print(avg2_smooth)
+ggsave("CovCluster2_smooth_expression_plot.pdf", avg2_smooth)
+
+#Cov 3 Fig
+cov3_fig <- cov_cluster3
+colnames(cov3_fig) <- gsub("X", "", colnames(cov3_fig))
+gene_expression_melted <- reshape2::melt(cov3_fig, id.vars = "Gene")
+
+# Rename columns for clarity
+colnames(gene_expression_melted) <- c("Gene", "Age", "Expression")
+gene_expression_melted$Age <- as.numeric(as.character(gene_expression_melted$Age))
+
+# Compute summary stats
+summary_stats <- gene_expression_melted %>%
+  group_by(Age) %>%
+  summarise(mean_expr = mean(Expression),
+            sd_expr = sd(Expression),
+            .groups = 'drop')
+
+# Plot: smooth line with shaded variance
+avg3_smooth <- ggplot(summary_stats, aes(x = Age, y = mean_expr)) +
+  geom_ribbon(aes(ymin = mean_expr - sd_expr, ymax = mean_expr + sd_expr), fill = "gray80", alpha = 0.5) +
+  geom_smooth(se = FALSE, color = "#2b8cbe", method = "loess", size = 1.2) +
+  theme_classic() +
+  labs(x = "Age",
+       y = "Expression trajectory") +
+  ylim(-0.5, 0.5) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 16))
+
+print(avg3_smooth)
+ggsave("CovCluster3_smooth_expression_plot.pdf", avg3_smooth)
+
+# Fit LOESS to mean expression
+loess_fit <- loess(mean_expr ~ Age, data = summary_stats, span = 0.5)
+
+# Predict over a fine-grained age grid
+age_grid <- seq(min(summary_stats$Age), max(summary_stats$Age), by = 0.1)
+predicted_vals <- predict(loess_fit, newdata = data.frame(Age = age_grid))
+
+# Find age of maximum predicted expression
+max_index <- which.max(predicted_vals)
+max_age <- age_grid[max_index]
+max_value <- predicted_vals[max_index]
+
+cat("Maximum gene expression occurs at age:", round(max_age, 2), "\n")
+cat("Expression value at that point:", round(max_value, 3), "\n")
+
+#Cov 4 Fig
+cov4_fig <- cov_cluster4
+colnames(cov4_fig) <- gsub("X", "", colnames(cov4_fig))
+gene_expression_melted <- reshape2::melt(cov4_fig, id.vars = "Gene")
+
+# Rename columns for clarity
+colnames(gene_expression_melted) <- c("Gene", "Age", "Expression")
+gene_expression_melted$Age <- as.numeric(as.character(gene_expression_melted$Age))
+
+# Compute summary stats
+summary_stats <- gene_expression_melted %>%
+  group_by(Age) %>%
+  summarise(mean_expr = mean(Expression),
+            sd_expr = sd(Expression),
+            .groups = 'drop')
+
+library(pracma)  # for numerical differentiation
+
+# Fit LOESS
+loess_fit <- loess(mean_expr ~ Age, data = summary_stats, span = 0.5)
+
+# Predict over a fine age grid
+age_grid <- seq(min(summary_stats$Age), max(summary_stats$Age), by = 0.1)
+predicted <- predict(loess_fit, newdata = data.frame(Age = age_grid))
+
+# Compute second derivative
+second_deriv <- diff(diff(predicted)) / (0.1^2)  # Second finite difference
+# Align with grid (since diff reduces length by 2)
+age_for_deriv <- age_grid[-c(1, length(age_grid))]
+
+# Find where second derivative crosses zero
+sign_change <- which(diff(sign(second_deriv)) != 0)
+
+if (length(sign_change) > 0) {
+  inflection_age <- age_for_deriv[sign_change[1]]
+  cat("Estimated inflection point at age:", round(inflection_age, 2), "\n")
+} else {
+  cat("No clear inflection point detected.\n")
+}
+
+# Plot: smooth line with shaded variance
+avg4_smooth <- ggplot(summary_stats, aes(x = Age, y = mean_expr)) +
+  geom_ribbon(aes(ymin = mean_expr - sd_expr, ymax = mean_expr + sd_expr), fill = "gray80", alpha = 0.5) +
+  geom_smooth(se = FALSE, color = "#2b8cbe", method = "loess", size = 1.2) +
+  theme_classic() +
+  labs(x = "Age",
+       y = "Expression trajectory") +
+  ylim(-0.5, 0.5) +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 16)
+  )
+
+print(avg4_smooth)
+ggsave("CovCluster4_smooth_expression_plot.pdf", avg4_smooth)
+
+# Fit LOESS to mean expression
+loess_fit <- loess(mean_expr ~ Age, data = summary_stats, span = 0.5)
+
+# Predict over a fine age grid
+age_grid <- seq(min(summary_stats$Age), max(summary_stats$Age), by = 0.1)
+predicted_vals <- predict(loess_fit, newdata = data.frame(Age = age_grid))
+
+# Find age of minimum predicted expression
+min_index <- which.min(predicted_vals)
+min_age <- age_grid[min_index]
+min_value <- predicted_vals[min_index]
+
+cat("Minimum gene expression occurs at age:", round(min_age, 2), "\n")
+cat("Expression value at that point:", round(min_value, 3), "\n")
