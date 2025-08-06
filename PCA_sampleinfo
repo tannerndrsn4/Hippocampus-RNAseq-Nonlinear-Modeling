@@ -105,3 +105,20 @@ p = ggplot(counts_pc_meta,aes(x=PC2,y=PC3,color=group)) +
   geom_point(size=2.5) + theme_minimal() + xlab('PC 2 (9.81%)') + ylab('PC 3 (7.43%)') + 
   theme(axis.ticks=element_blank(),axis.text=element_blank(),axis.title = element_text(size=18), legend.text = element_text(size=18), legend.title = element_text(size=18))
 plot(p)
+
+library(ggpubr)  # for stat_cor()
+
+p_pc2_age <- ggplot(counts_pc_meta, aes(x = age, y = PC2)) +
+  geom_point(size = 2.5, color = "#41a0c3", alpha = 0.8) +
+  geom_smooth(method = "lm", se = TRUE, color = "black", linetype = "solid") +
+  theme_minimal() +
+  xlab("Age") + ylab("PC 2 (11.45%)") +
+  theme(
+    axis.title = element_text(size = 20),
+    axis.text = element_text(size = 16),
+    legend.position = "none",
+    axis.ticks = element_blank()
+  )
+
+print(p_pc2_age)
+ggsave(filename = "PC2_vs_Age_Correlation.pdf", p_pc2_age)
