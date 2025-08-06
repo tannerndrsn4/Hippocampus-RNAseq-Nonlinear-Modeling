@@ -9,12 +9,13 @@ Steps **1-5** were completed using shell scripts.
 4. **Mapping to Mmul_10** w/ STAR -- [Array_mapping.sh](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/Array_mapping.sh)
 5. **Generate count matrix** w/ featureCounts -- [featurecounts_array.sh](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/featurecounts_array.sh)
 
-Steps **6-10** were completed using RStudio.
+Steps **6-11** were completed using RStudio.
 
 6. **Read count normalization** w/ edgeR & limma -- [read_count_normalization](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/read_count_normalization) 
 7. **PCA analysis & Sample information** figure generation -- [PCA_sampleinfo](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/PCA_sampleinfo)
 8. **Nonlinear modeling** differential expression analyses using ARIMA approach -- [nonlinear_modeling](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/nonlinear_modeling)
 9. **Gene dysregulation analysis** -- [dysregulation](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/dysregulation)
 10. **Gene ontology enrichment analysis** w/ enrichR -- [gene_ontology](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/gene_ontology)
+11. **Cell type deconvolution analysis** w/ Cibersortx -- [deconvolution](https://github.com/tannerndrsn4/Hippocampus-RNAseq-Nonlinear-Modeling/blob/main/cellType_deconvolution)
 
 All analyses were completed on UO's computer cluster Talapas.
