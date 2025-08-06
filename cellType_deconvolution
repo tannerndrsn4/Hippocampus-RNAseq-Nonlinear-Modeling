@@ -1,0 +1,195 @@
+#Prep Data for Cibersort run
+hasDuplicates <- duplicated(row.names(hip_cellclass))
+hip_cellclass <- hip_cellclass[!hasDuplicates, ]
+if (!requireNamespace("biomaRt", quietly = TRUE)) {
+  install.packages("biomaRt")
+}
+
+library(biomaRt)
+
+# Ensembl species and dataset
+ensemblSpecies <- "macaca_mulatta_gene_ensembl"  # Species: Macaca mulatta (Rhesus monkey)
+ensemblDataset <- "mmulatta_gene_ensembl"  # Dataset: Macaca mulatta genes
+
+# Function to convert Ensembl gene IDs to gene names
+convertEnsemblToGeneName <- function(ensemblIDs) {
+  mart <- useMart(biomart = "ensembl", dataset = ensemblDataset, host = "www.ensembl.org")
+  results <- getBM(attributes = c("ensembl_gene_id", "external_gene_name"), 
+                   filters = "ensembl_gene_id", 
+                   values = ensemblIDs, 
+                   mart = mart)
+  geneNames <- results$external_gene_name
+  return(geneNames)
+}
+
+convertedGeneNames <- convertEnsemblToGeneName(row.names(hip_cellclass))
+new_hip_cellclass <- hip_cellclass
+row.names(new_hip_cellclass) <- convertedGeneNames
+
+convertedGeneNames <- convertEnsemblToGeneName(row.names(hip_cellsubcluster))
+new_hip_cellsubcluster <- hip_cellsubcluster
+row.names(new_hip_cellsubcluster) <- convertedGeneNames
+
+write.table(new_hip_cellclass, file = "hip_cellclass.txt", sep = "\t", quote = FALSE)
+write.table(Covpredicted_nonzero, file = "Covpredicted_nonzero.txt", sep = "\t", quote = FALSE)
+
+write.table(new_hip_cellsubcluster, file = "hip_cellsubcluster.txt", sep = "\t", quote = FALSE, col.names=NA)
+
+# Filter dataframe based on matching row names with matrix
+filteredDataframe <- counts[row.names(counts) %in% row.names(Covfitted_nonzero), ]
+
+# Remove columns based on values in 'omit' vector
+filteredDataframe <- filteredDataframe[, !(colnames(filteredDataframe) %in% omit)]
+
+hasDuplicates <- duplicated(row.names(filteredDataframe))
+filteredDataframe <- filteredDataframe[!hasDuplicates, ]
+write.table(filteredDataframe, file = "sig_genes.txt", sep = "\t", quote = FALSE, row.names = TRUE, col.names = TRUE)
+
+hasDuplicates <- duplicated(row.names(new_hip_cellclass))
+new_hip_cellclass <- new_hip_cellclass[!hasDuplicates, ]
+write.table(new_hip_cellclass, file = "hip_cellclass.txt", sep = "\t", quote = FALSE, col.names=NA)
+
+hasDuplicates <- duplicated(row.names(new_hip_cellsubcluster))
+new_hip_cellsubcluster <- new_hip_cellsubcluster[!hasDuplicates, ]
+write.table(new_hip_cellsubcluster, file = "hip_cellsubcluster.txt", sep = "\t", quote = FALSE, col.names=NA)
+
+
+#remove 8 individuals from analysis that were outliers & had choroid plexus contamination
+omit <- c("20267", "23298", "27796", "27381", "20616", "20698", "24699", "18621")
+covariates <- filter(covariates, !(sampid %in% omit))
+new_counts <- subset(counts, select = c(covariates$sampid))
+
+hasDuplicates <- duplicated(row.names(new_counts))
+gene_counts <- new_counts[!hasDuplicates, ]
+gene_counts <- gene_counts[row.names(gene_counts) %in% row.names(new_hip_cellclass), ]
+write.table(gene_counts, file = "gene_counts.txt", sep = "\t", quote = FALSE, col.names=NA)
+
+##Run using GUI interface & interpret output below:
+# Load necessary libraries
+library(ggplot2)  # For visualization
+library(dplyr)    # For data manipulation
+
+results <- read.csv(file = "CIBERSORTx_Job13_Results_updated_FINALFORPAPER.csv")
+
+# Perform linear regression
+model <- lm(APOA2.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(astrocytes ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(basket.cells ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+#model <- lm(cerebellar.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+#summary(model)
+
+# Perform linear regression
+model <- lm(dopaminergic.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(ependymal.cells ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+#model <- lm(F5.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+#summary(model)
+
+# Perform linear regression
+model <- lm(GABAergic.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(glutamatergic.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+#model <- lm(KIR3DL12.microglia ~ Age, data = results)
+
+# Print the summary of the regression model
+#summary(model)
+
+# Perform linear regression
+#model <- lm(KIR3DL12.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+#summary(model)
+
+# Perform linear regression
+model <- lm(medium.spiny.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(microglia ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(oligodendrocyte.precursor.cells ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+model <- lm(oligodendrocytes ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+# Perform linear regression
+#model <- lm(serotonergic.neurons ~ Age, data = results)
+
+# Print the summary of the regression model
+#summary(model)
+
+# Perform linear regression
+model <- lm(vascular.cells ~ Age, data = results)
+
+# Print the summary of the regression model
+summary(model)
+
+
+# Create a scatter plot with regression line
+glut <- ggplot(results, aes(x = Age, y = glutamatergic.neurons)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "#2b8cbe", show.legend = FALSE) +
+  labs(x = "Age", y = "Proportion of glutamatergic neurons") +
+  theme_minimal()
+
+glut
+ggsave(filename = "Glutamatergicneurons_age.pdf", glut)
+
+# Create a scatter plot with regression line
+olig <- ggplot(results, aes(x = Age, y = oligodendrocytes)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = TRUE, color = "#2b8cbe", show.legend = FALSE) +
+  labs(x = "Age", y = "Proportion of oligodendrocytes") +
+  theme_minimal()
+
+olig
+ggsave(filename = "Oligodendrocytes_age.pdf", olig)
